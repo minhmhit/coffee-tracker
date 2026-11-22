@@ -7,22 +7,53 @@
     "build": "nest build",
     "start": "nest start",
     "start:dev": "nest start --watch",
-    "start:prod": "node dist/main"
+    "start:prod": "node dist/main",
+    "test": "jest",
+    "dry-run": "ts-node src/ingestion/scripts/dry-run.ts",
+    "backfill": "ts-node src/ingestion/scripts/backfill-history.ts"
   },
   "dependencies": {
+    "@nestjs/bullmq": "^11.0.5",
     "@nestjs/common": "^11.0.10",
     "@nestjs/core": "^11.0.10",
     "@nestjs/platform-express": "^11.0.10",
     "@prisma/client": "^6.4.0",
+    "bullmq": "^6.7.8",
+    "cheerio": "^1.2.0",
+    "fast-xml-parser": "^5.12.1",
+    "ioredis": "^6.0.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1"
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.5",
     "@nestjs/schematics": "^11.0.2",
+    "@nestjs/testing": "^11.2.11",
     "@types/express": "^5.0.0",
+    "@types/ioredis": "^5.0.0",
+    "@types/jest": "^30.0.0",
     "@types/node": "^22.13.4",
+    "jest": "^30.5.2",
     "prisma": "^6.4.0",
+    "ts-jest": "^29.4.15",
+    "ts-node": "^10.9.2",
     "typescript": "^5.7.3"
+  },
+  "jest": {
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
+    ],
+    "rootDir": "src",
+    "testRegex": ".*\\.spec\\.ts$",
+    "transform": {
+      "^.+\\.(t|j)s$": "ts-jest"
+    },
+    "collectCoverageFrom": [
+      "**/*.(t|j)s"
+    ],
+    "coverageDirectory": "../coverage",
+    "testEnvironment": "node"
   }
 }
