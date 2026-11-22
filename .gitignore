@@ -27,7 +27,7 @@ out/
 .idea/
 .DS_Store
 Thumbs.db
-docs/
+
 # Logs
 *.log
 npm-debug.log*
