@@ -1,0 +1,106 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum ForecastRunStatus {
+  SUCCESS
+  FAILED
+}
+
+model RawMarketPrice {
+  id            Int          @id @default(autoincrement())
+  price_date    DateTime     @unique @db.Date
+  price_daklak  Decimal      @db.Decimal(12, 2)
+  price_lamdong Decimal      @db.Decimal(12, 2)
+  price_gialai  Decimal      @db.Decimal(12, 2)
+  price_daknong Decimal      @db.Decimal(12, 2)
+  price_avg     Decimal      @db.Decimal(12, 2)
+  london_m1     Decimal?     @db.Decimal(10, 2)
+  london_m3     Decimal?     @db.Decimal(10, 2)
+  london_m6     Decimal?     @db.Decimal(10, 2)
+  usd_vnd       Decimal?     @db.Decimal(10, 2)
+  brent_oil     Decimal?     @db.Decimal(10, 2)
+  source_meta   Json?
+  created_at    DateTime     @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime     @updatedAt @db.Timestamptz(6)
+
+  daily_signal  DailySignal?
+
+  @@index([price_date(sort: Desc)])
+  @@map("raw_market_prices")
+}
+
+model MacroClimateMonthly {
+  month_date      DateTime @id @db.Date
+  oni_index       Decimal? @db.Decimal(5, 2)
+  vn_rain_anomaly Decimal? @db.Decimal(8, 2)
+  br_rain_anomaly Decimal? @db.Decimal(8, 2)
+  created_at      DateTime @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime @updatedAt @db.Timestamptz(6)
+
+  @@index([month_date(sort: Desc)])
+  @@map("macro_climate_monthly")
+}
+
+model DailySignal {
+  signal_date    DateTime       @id @db.Date
+  basis          Decimal        @db.Decimal(12, 2)
+  spread         Decimal?       @db.Decimal(10, 2)
+  volatility_30d Decimal?       @db.Decimal(10, 4)
+  z_score        Decimal?       @db.Decimal(8, 4)
+  is_anomaly     Boolean        @default(false)
+  regime         String?
+  notes          String?
+  created_at     DateTime       @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime       @updatedAt @db.Timestamptz(6)
+
+  raw_market_price RawMarketPrice @relation(fields: [signal_date], references: [price_date], onDelete: Cascade)
+
+  @@index([signal_date(sort: Desc)])
+  @@map("daily_signals")
+}
+
+model ForecastRun {
+  run_id         String             @id @default(uuid()) @db.Uuid
+  forecast_date  DateTime           @db.Date
+  status         ForecastRunStatus
+  model_version  String?
+  blend_weights  Json?
+  metrics        Json?
+  error_message  String?
+  created_at     DateTime           @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime           @updatedAt @db.Timestamptz(6)
+
+  predictions    ForecastPrediction[]
+
+  @@index([forecast_date(sort: Desc)])
+  @@index([status])
+  @@map("forecast_runs")
+}
+
+model ForecastPrediction {
+  id               Int         @id @default(autoincrement())
+  run_id           String      @db.Uuid
+  horizon_week     Int
+  target_date      DateTime    @db.Date
+  pred_p10         Decimal     @db.Decimal(12, 2)
+  pred_p50         Decimal     @db.Decimal(12, 2)
+  pred_p90         Decimal     @db.Decimal(12, 2)
+  baseline_rw      Decimal?    @db.Decimal(12, 2)
+  baseline_futures Decimal?    @db.Decimal(12, 2)
+  actual_price     Decimal?    @db.Decimal(12, 2)
+  error_pct        Decimal?    @db.Decimal(8, 4)
+  created_at       DateTime    @default(now()) @db.Timestamptz(6)
+
+  run              ForecastRun @relation(fields: [run_id], references: [run_id], onDelete: Cascade)
+
+  @@unique([run_id, horizon_week])
+  @@index([target_date(sort: Desc)])
+  @@index([run_id])
+  @@map("forecast_predictions")
+}

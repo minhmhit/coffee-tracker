@@ -1,0 +1,6 @@
+{
+  "name": "@coffee-tracker/web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Coffee Tracker Next.js Frontend Dashboard (Scaffolded in Phase 4)"
+}
