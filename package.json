@@ -1,0 +1,12 @@
+{
+  "name": "coffee-tracker",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "pnpm@11.5.2",
+  "scripts": {
+    "build": "pnpm --filter @coffee-tracker/orchestrator run build",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f"
+  }
+}
