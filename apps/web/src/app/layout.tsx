@@ -1,10 +1,32 @@
 import type { Metadata } from 'next';
+import { Newsreader, Inter, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 
+const newsreader = Newsreader({
+  subsets: ['vietnamese', 'latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-serif',
+  display: 'swap',
+});
+
+const inter = Inter({
+  subsets: ['vietnamese', 'latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-sans',
+  display: 'swap',
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ['vietnamese', 'latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-mono',
+  display: 'swap',
+});
+
 export const metadata: Metadata = {
-  title: 'Coffee Tracker — Giám sát & Dự báo Giá Cà phê Tây Nguyên 6 Tháng',
+  title: 'Coffee Tracker — Giá Cà phê Tây Nguyên & Dự báo 6 Tháng',
   description:
-    'Hệ thống theo dõi thị trường cà phê Tây Nguyên thời gian thực và dự báo phân vị 6 tháng sử dụng mô hình kết hợp VECM và LightGBM Quantile.',
+    'Theo dõi giá cà phê nhân xô Tây Nguyên (Đắk Lắk, Lâm Đồng, Gia Lai, Đắk Nông), thời tiết vùng trồng, nhận định thị trường và dự báo xu hướng 6 tháng.',
 };
 
 export default function RootLayout({
@@ -13,8 +35,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="vi">
-      <body className="bg-stone-50 text-stone-900 min-h-screen antialiased selection:bg-amber-200/70 selection:text-amber-950">
+    <html
+      lang="vi"
+      className={`${newsreader.variable} ${inter.variable} ${jetbrainsMono.variable}`}
+    >
+      <body className="font-sans bg-[#FDFBF7] text-[#18181B] min-h-screen antialiased selection:bg-[#DCFCE7] selection:text-[#14532D]">
         {children}
       </body>
     </html>

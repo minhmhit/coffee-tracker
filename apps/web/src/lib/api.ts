@@ -28,7 +28,7 @@ async function safeFetch<T>(endpoint: string, fallback: T): Promise<T> {
     }
     return (await res.json()) as T;
   } catch (err: any) {
-    console.error(`API network error [${endpoint}]: ${err.message}`);
+    console.warn(`API network error [${endpoint}]: ${err.message}`);
     return fallback;
   }
 }
