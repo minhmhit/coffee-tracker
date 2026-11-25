@@ -23,9 +23,9 @@
 
 ## 2. Current Progress Tracker `[AUTO-UPDATE]`
 
-- **Active Phase:** Phase 4 — Completed (Project 100% Complete)
-- **Last Completed Step:** `STEP 4.3` (Next.js Dashboard & E2E Smoke Test — ALL STEPS COMPLETE)
-- **Next Step to Execute:** `NONE` (Project successfully delivered and production-ready)
+- **Active Phase:** Phase 5 — Live Weather, Explainable Insights, Telegram Onboarding & UX Redesign
+- **Last Completed Step:** `STEP 5.1` (Live Daily Weather, ICE Certified Robusta Stocks & Schema Extension)
+- **Next Step to Execute:** `STEP 5.2` (Explainable Market Insights Engine)
 - **Overall Status:**
   - [x] Phase 0: Step 0.1 (Monorepo & Docker - DONE)
   - [x] Phase 0: Step 0.2 (DB Schema & Prisma - DONE)
@@ -41,6 +41,8 @@
   - [x] Phase 4: Step 4.1 (NestJS Forecast Worker - DONE)
   - [x] Phase 4: Step 4.2 (Dashboard REST APIs - DONE)
   - [x] Phase 4: Step 4.3 (Next.js Dashboard & E2E Smoke Test - DONE)
+  - [x] Phase 5: Step 5.1 (Live Weather, ICE Robusta Stocks & Schema Extension - DONE)
+  - [ ] Phase 5: Step 5.2 (Explainable Insights) | Step 5.3 (Telegram Self-Service & Enriched Briefing) | Step 5.4 (UX Redesign & E2E Smoke Test)
 
 ---
 
@@ -73,7 +75,9 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
 - **Econometric Model Choice:** Option A (statsmodels VECM with Johansen rank >= 1, automatic fallback to Ridge-regularized VAR on log-differences with alpha=1.0) (Confirmed in Step 3.2)
 - **LightGBM Quantile Architecture:** Option A (Global Horizon-Conditioned LightGBM alpha=0.10, 0.50, 0.90 with horizon_week feature and strict s+h<=t_0 cutoff rule) (Confirmed in Step 3.3)
 - **Walk-Forward CV Settings:** 12 rolling origins, step 4w, 1-year out-of-sample audit (Confirmed in Step 3.4)
-
+- **Daily Weather Scope & Provider:** Option A — all 4 Central Highlands provinces (`DAKLAK`, `LAMDONG`, `GIALAI`, `DAKNONG`) via Open-Meteo Forecast API (`https://api.open-meteo.com/v1/forecast`), updated at `05:45` (`45 5 * * *` VN) + paired with `08:30` & `01:00` ingestion (Confirmed in Step 5.1)
+- **ICE Certified Robusta Stocks Source & Sanity:** Primary `https://www.ice.com/report/173` (returns SPA/click-through gate) -> Fallback `vietnambiz.vn` coffee market articles (`5.791 lô` verified live) -> Stale carry-forward with `is_stale = true`; bounds `[500, 50000]` lots, `1 lot = 10 tonnes`, `<= ±25%` DoD delta (Confirmed in Step 5.1)
+- **Coffee Inventory Data Strategy:** Ingest real ICE Certified Robusta Stocks (`ice_robusta_stocks`, 1 lot = 10 tonnes) from external source (Primary: ICE Report Center `https://www.ice.com/report/173`; Fallback: `vietnambiz.vn` daily market report / stale-flag retention), combined with Calendar Spread (M1-M6) & Regime in `InsightsModule` (Confirmed for Phase 5)
 ---
 
 ## 4. Active Architecture State `[AUTO-UPDATE]`
@@ -89,11 +93,15 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
   - `daily_signals`: **3,248 continuous records** (2018-01-01 to 2026-11-22). Columns: `signal_date`, `basis`, `spread`, `volatility_30d`, `z_score`, `is_anomaly`, `regime`, `notes`, timestamps.
   - `forecast_runs`: **1 record** (`b10e0d43-d324-4253-b76a-472333f4af25`, status: `SUCCESS`).
   - `forecast_predictions`: **26 records** ($h = 1..26$, $P_{10}, P_{50}, P_{90}$, Naive RW, Futures baseline).
+  - `daily_weather`: **4 records** for `2026-11-25` (`DAKLAK`, `LAMDONG`, `GIALAI`, `DAKNONG`).
+  - `ice_robusta_stocks`: **1 record** (`2026-11-24`, `5,791` lots / `57,910` tonnes via `vietnambiz.vn` fallback).
+  - `telegram_subscribers`: **0 records** (Target for Step 5.3 onboarding).
 - **BullMQ Queues Active:**
-  - `ingestion-queue`: 3 repeatable schedulers:
+  - `ingestion-queue`: 4 repeatable schedulers:
     1. `morning_domestic_0830` (`30 8 * * *` Asia/Ho_Chi_Minh)
     2. `night_london_close_0100` (`0 1 * * *` Asia/Ho_Chi_Minh)
     3. `monthly_climate_05_0300` (`0 3 5 * *` Asia/Ho_Chi_Minh)
+    4. `early_weather_0545` (`45 5 * * *` Asia/Ho_Chi_Minh)
   - `signals-queue`: Chained tự động sau ingestion job.
   - `alert-queue`: Repeatable scheduler `morning_briefing_0600` (`0 6 * * *` Asia/Ho_Chi_Minh) gửi điểm tin 6h sáng hàng ngày + nhận job Anomaly Alert & System Error.
   - `forecast-queue`: Repeatable scheduler `weekly_forecast_monday_0200` (`0 2 * * 1` Asia/Ho_Chi_Minh).
@@ -120,6 +128,10 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
   - `GET /api/alerts/status` (Telegram alerting config and 06:00 AM cron schedule status)
   - `GET /api/climate/latest` (Latest monthly climate anomaly)
   - `GET /api/climate/history` (Monthly climate history)
+  - `GET /api/weather/today` (Live 4-province Central Highlands weather + Đắk Lắk benchmark)
+  - `GET /api/weather/history` (Historical daily weather ?days=7&province=DAKLAK)
+  - `GET /api/stocks/robusta/latest` (ICE Certified Robusta stocks lots/tonnes + 7d/30d change)
+  - `GET /api/stocks/robusta/history` (Historical ICE Certified Robusta stocks ?days=90)
 - **NextJS Frontend Active:**
   - `http://localhost:3000` (Next.js 15 App Router Dashboard, Pure SVG Probabilistic Fan Chart, KPI Cards, Signals Table, Audit Trail)
 - **NestJS Modules Active:** `HealthModule`, `PrismaModule` (Global), `IngestionModule`, `SignalsModule`, `AlertsModule`, `ForecastModule`
@@ -153,3 +165,7 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
 | `STEP 3.2` | 2026-11-25 | Econometric Leg (VECM & Ridge VAR fallback), Naive RW & Futures Baseline, 15/15 Pytest PASS | [step_3_2_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_3_2_report.md) |
 | `STEP 3.3` | 2026-11-25 | Nonlinear Leg (Global Horizon LightGBM Quantile P10/P50/P90), Cutoff Leakage Rule, 17/17 Pytest PASS | [step_3_3_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_3_3_report.md) |
 | `STEP 3.4` | 2026-11-25 | Walk-Forward Ensemble (12 rolling origins), full FastAPI integration HTTP 200, 19/19 Pytest PASS | [step_3_4_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_3_4_report.md) |
+| `STEP 4.1` | 2026-11-25 | NestJS forecast-queue worker, atomic Prisma persistence, 6/6 Jest suites PASS, live run saved | [step_4_1_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_4_1_report.md) |
+| `STEP 4.2` | 2026-11-25 | Dashboard REST APIs (/market, /signals, /forecast, /climate), CORS enabled, 8/8 Jest suites PASS | [step_4_2_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_4_2_report.md) |
+| `STEP 4.3` | 2026-11-25 | Next.js 15 Dashboard UI + Pure SVG Fan Chart + E2E Smoke Test across all services PASS | [step_4_3_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_4_3_report.md) |
+| `STEP 5.1` | 2026-11-25 | 3 new Prisma tables, WeatherAdapter (4 provinces), IceStocksAdapter + sanity validator, 9/9 Jest suites (83 tests) PASS | [step_5_1_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_5_1_report.md) |
