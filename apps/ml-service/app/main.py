@@ -7,8 +7,8 @@ from app.preprocessing import (
     resample_daily_to_weekly,
     merge_macro_climate_causally,
     build_causal_features,
-    build_multistep_targets,
 )
+from app.ensemble import generate_ensemble_forecast
 
 logger = logging.getLogger("coffee_tracker_ml")
 logging.basicConfig(level=logging.INFO)
@@ -16,7 +16,7 @@ logging.basicConfig(level=logging.INFO)
 app = FastAPI(
     title="Coffee Tracker ML Service",
     description="Stateless probabilistic forecasting engine for Central Highlands coffee prices",
-    version="0.1.0",
+    version="1.0.0",
 )
 
 
@@ -27,43 +27,56 @@ def health_check():
 
 @app.post(
     "/api/v1/forecast/weekly",
-    status_code=status.HTTP_501_NOT_IMPLEMENTED,
-    summary="Generate 26-week probabilistic forecast (Step 3.1 Contract & Feature Pipeline)",
+    response_model=ForecastResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Generate 26-week probabilistic forecast via Two-Legged Ensemble",
 )
-def forecast_weekly(request: ForecastRequest):
+def forecast_weekly(request: ForecastRequest) -> ForecastResponse:
     """
-    Contract endpoint for 26-week probabilistic forecasting.
-    Validates Pydantic v2 schemas and executes zero-leakage causal feature pipeline.
-    Full forecasting ensemble models (VECM & LightGBM Quantile) are wired in Steps 3.2-3.4.
+    Production probabilistic 6-month (26-week) coffee price forecasting endpoint:
+    1. Validates strict Pydantic v2 input schemas (rejects NaN/Inf, requires >= 156 weeks).
+    2. Zero-leakage temporal resampling: Daily -> W-FRI with bounded ffill(limit=5).
+    3. Causal macro climate merge with publication lag (Month M visible only at Month M+1).
+    4. Causal feature engineering matrix at origin t_0.
+    5. Expanding-Window Walk-Forward Cross Validation across 12 rolling origins to optimize blending weights.
+    6. Refits Leg 1 (Econometric: VECM / Ridge VAR) and Leg 2 (Direct Multi-Horizon LightGBM Quantile).
+    7. Blends quantiles with guaranteed monotonicity (P10 <= P50 <= P90) and attaches benchmark baselines (Naive, Futures).
+    8. Returns validated ForecastResponse with out-of-sample audit metrics (MAPE at 4w, 12w, 26w, Pinball Loss).
     """
-    logger.info(f"Received forecast request for origin date {request.run_date} with {len(request.market_prices)} daily prices")
+    try:
+        logger.info(
+            f"Executing forecast run for origin {request.run_date} with {len(request.market_prices)} daily prices "
+            f"and {len(request.macro_climate)} climate observations"
+        )
 
-    # 1. Resample to weekly W-FRI with bounded ffill
-    df_weekly = resample_daily_to_weekly(request.market_prices)
+        # 1. Resample daily to weekly W-FRI
+        df_weekly = resample_daily_to_weekly(request.market_prices)
 
-    # 2. Merge macro climate causally with 1-month publication lag
-    df_merged = merge_macro_climate_causally(df_weekly, request.macro_climate)
+        # 2. Merge macro climate causally
+        df_merged = merge_macro_climate_causally(df_weekly, request.macro_climate)
 
-    # 3. Construct causal feature engineering matrix
-    df_features = build_causal_features(df_merged)
+        # 3. Construct causal feature engineering matrix
+        df_features = build_causal_features(df_merged)
 
-    # 4. Construct direct multi-step targets
-    df_targets = build_multistep_targets(df_features, max_h=26)
+        # 4. Run Walk-Forward ensemble and generate final forecast response
+        response = generate_ensemble_forecast(
+            df_features=df_features,
+            origin_date=request.run_date,
+            horizon_weeks=26,
+            run_cv=True,
+        )
 
-    feature_cols = [
-        c for c in df_targets.columns
-        if not c.startswith("target_") and c != "price_daklak"
-    ]
+        return response
 
-    # Return 501 until model fitting legs (Steps 3.2-3.4) are completed
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail={
-            "message": "Weekly feature pipeline validated successfully. Model legs are implemented in Steps 3.2-3.4.",
-            "run_date": str(request.run_date),
-            "weekly_rows": len(df_weekly),
-            "feature_count": len(feature_cols),
-            "latest_friday": str(df_weekly.index[-1].date()),
-            "benchmark_price": float(df_weekly["price_daklak"].iloc[-1]),
-        },
-    )
+    except ValueError as val_err:
+        logger.error(f"Validation error during forecast generation: {str(val_err)}")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(val_err),
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error during forecast generation: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Forecasting engine error: {str(e)}",
+        )

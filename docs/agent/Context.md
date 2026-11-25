@@ -23,9 +23,9 @@
 
 ## 2. Current Progress Tracker `[AUTO-UPDATE]`
 
-- **Active Phase:** Phase 3 — Machine Learning & Probabilistic Forecasting
-- **Last Completed Step:** `STEP 3.3` (Nonlinear Leg: Direct Multi-Horizon LightGBM Quantile Regression)
-- **Next Step to Execute:** `STEP 3.4` (Expanding-Window Walk-Forward Ensemble & Full FastAPI Integration)
+- **Active Phase:** Phase 4 — Orchestration, Forecast Persistence & Frontend Dashboard
+- **Last Completed Step:** `STEP 3.4` (Expanding-Window Walk-Forward Ensemble & Full FastAPI Integration)
+- **Next Step to Execute:** `STEP 4.1` (NestJS `forecast-queue` Worker & Forecast Run Persistence)
 - **Overall Status:**
   - [x] Phase 0: Step 0.1 (Monorepo & Docker)
   - [x] Phase 0: Step 0.2 (DB Schema & Prisma)
@@ -37,7 +37,7 @@
   - [x] Phase 3: Step 3.1 (FastAPI Contract & Weekly Features - DONE)
   - [x] Phase 3: Step 3.2 (VECM/BVAR & Baselines - DONE)
   - [x] Phase 3: Step 3.3 (LightGBM Quantile - DONE)
-  - [ ] Phase 3: Step 3.4 (Walk-Forward Ensemble & Pytest)
+  - [x] Phase 3: Step 3.4 (Walk-Forward Ensemble & Full FastAPI Integration - DONE)
   - [ ] Phase 4: Step 4.1 (NestJS Forecast Worker) | Step 4.2 (Dashboard REST APIs) | Step 4.3 (Next.js Dashboard & E2E Smoke Test)
 
 ---
@@ -70,6 +70,7 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
 - **Daily Missing Gap Handling:** `ffill(limit=5)` before resampling to Friday close `W-FRI` (Confirmed in Step 3.1)
 - **Econometric Model Choice:** Option A (statsmodels VECM with Johansen rank >= 1, automatic fallback to Ridge-regularized VAR on log-differences with alpha=1.0) (Confirmed in Step 3.2)
 - **LightGBM Quantile Architecture:** Option A (Global Horizon-Conditioned LightGBM alpha=0.10, 0.50, 0.90 with horizon_week feature and strict s+h<=t_0 cutoff rule) (Confirmed in Step 3.3)
+- **Walk-Forward CV Settings:** 12 rolling origins, step 4w, 1-year out-of-sample audit (Confirmed in Step 3.4)
 
 ---
 
@@ -79,13 +80,13 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
   - `coffee_tracker_postgres` (PostgreSQL 17 on port 5432) — Healthy
   - `coffee_tracker_redis` (Redis 7 on port 6379) — Healthy
   - `coffee_tracker_orchestrator` (NestJS on port 3001) — Healthy
-  - `coffee_tracker_ml_service` (FastAPI on port 8000) — Healthy (Pytest 17/17 tests PASS)
+  - `coffee_tracker_ml_service` (FastAPI on port 8000) — Healthy (Pytest 19/19 tests PASS, Live 200 response ~10.6s)
 - **Database Tables Created & Active (PostgreSQL 17):**
   - `raw_market_prices`: **3,248 continuous records** (2018-01-01 to 2026-11-22).
   - `macro_climate_monthly`: **107 continuous monthly records** (2018-01-01 to 2026-11-01).
   - `daily_signals`: **3,248 continuous records** (2018-01-01 to 2026-11-22). Columns: `signal_date`, `basis`, `spread`, `volatility_30d`, `z_score`, `is_anomaly`, `regime`, `notes`, timestamps.
-  - `forecast_runs`: 0 records (Target for Phase 3/4).
-  - `forecast_predictions`: 0 records (Target for Phase 3/4).
+  - `forecast_runs`: 0 records (Target for Phase 4.1).
+  - `forecast_predictions`: 0 records (Target for Phase 4.1).
 - **BullMQ Queues Active:**
   - `ingestion-queue`: 3 repeatable schedulers:
     1. `morning_domestic_0830` (`30 8 * * *` Asia/Ho_Chi_Minh)
@@ -95,12 +96,13 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
   - `alert-queue`: Repeatable scheduler `morning_briefing_0845` (`45 8 * * *` Asia/Ho_Chi_Minh) + nhận job Anomaly Alert & System Error.
 - **FastAPI Endpoints Active:**
   - `GET /health` (Healthy)
-  - `POST /api/v1/forecast/weekly` (Strict Pydantic v2 Contract & Causal Feature Pipeline validated)
+  - `POST /api/v1/forecast/weekly` (Production Ready: Two-Legged Walk-Forward Ensemble, 26-week P10/P50/P90, Naive & Futures baselines, out-of-sample MAPE metrics)
 - **Forecasting Models Active (apps/ml-service):**
   - `naive_random_walk` (Benchmark 1: Constant Y_t)
   - `futures_implied_baseline` (Benchmark 2: Interpolated M1-M3-M6 + 52w mean basis)
   - `econometric_forecast` (Leg 1: VECM rank >= 1, Ridge VAR fallback)
   - `lgbm_quantile_forecast` (Leg 2: Global Horizon-Conditioned LightGBM Quantile Regression)
+  - `generate_ensemble_forecast` (Master Ensemble: 12-origin Walk-Forward CV blending)
 - **NestJS API Endpoints Active:** `GET /health` (Healthy)
 - **NestJS Modules Active:** `HealthModule`, `PrismaModule` (Global), `IngestionModule`, `SignalsModule`, `AlertsModule`
 
@@ -113,8 +115,7 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
 - Toàn bộ các trường tài chính đều tuân thủ 100% Zero Float Principle (Prisma Decimal / PostgreSQL NUMERIC).
 - Telegram dispatch đã được xác minh gửi thực tế thành công tới chat ID người dùng qua Telegram Bot API (Message IDs 5, 6, 7).
 - Causal feature pipeline đã vượt qua 100% Leakage Canary Test (zero temporal data leakage).
-- Econometric Leg & Baselines đã vượt qua 100% các bài kiểm tra số học và tính đơn điệu phân vị.
-- Nonlinear Leg (LightGBM Quantile) vượt qua bài kiểm tra Cutoff Leakage Rule, đơn điệu phân vị, và đạt runtime ~0.68s (17/17 Pytest PASS).
+- Toàn bộ 4 mô hình (Naive, Futures, Econometric, LightGBM) và Walk-Forward Ensemble đã vượt qua 100% các bài kiểm tra (19/19 Pytest PASS, live latency ~10.6s).
 
 ---
 
@@ -133,3 +134,4 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
 | `STEP 3.1` | 2026-11-25 | FastAPI Pydantic v2 schemas, W-FRI causal feature pipeline, zero-leakage canary test, 11/11 Pytest PASS | [step_3_1_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_3_1_report.md) |
 | `STEP 3.2` | 2026-11-25 | Econometric Leg (VECM & Ridge VAR fallback), Naive RW & Futures Baseline, 15/15 Pytest PASS | [step_3_2_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_3_2_report.md) |
 | `STEP 3.3` | 2026-11-25 | Nonlinear Leg (Global Horizon LightGBM Quantile P10/P50/P90), Cutoff Leakage Rule, 17/17 Pytest PASS | [step_3_3_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_3_3_report.md) |
+| `STEP 3.4` | 2026-11-25 | Walk-Forward Ensemble (12 rolling origins), full FastAPI integration HTTP 200, 19/19 Pytest PASS | [step_3_4_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_3_4_report.md) |
