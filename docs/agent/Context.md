@@ -24,8 +24,8 @@
 ## 2. Current Progress Tracker `[AUTO-UPDATE]`
 
 - **Active Phase:** Phase 6 — Editorial UI Integration (Stitch), SEO Optimization & Free-Tier Deployment Plan
-- **Last Completed Step:** `STEP 6.2` (Technical SEO Audit, Rich Social Previews & Core Web Vitals)
-- **Next Step to Execute:** `STEP 6.3` (Free-Tier Cloud Deployment Feasibility Research & `deploy_plan.md`)
+- **Last Completed Step:** `STEP 6.3` (Production Standalone Dockerfile & 5-Container Docker Compose Integration)
+- **Next Step to Execute:** `STEP 6.4` (Free-Tier Cloud Deployment Feasibility Research & `deploy_plan.md`)
 - **Overall Status:**
   - [x] Phase 0: Step 0.1 (Monorepo & Docker - DONE)
   - [x] Phase 0: Step 0.2 (DB Schema & Prisma - DONE)
@@ -47,7 +47,9 @@
   - [x] Phase 5: Step 5.4 (UX Redesign & E2E Smoke Test - DONE)
   - [x] Phase 6: Step 6.1 (Stitch AI Light-Editorial Redesign & Senior Hard Overrides - DONE)
   - [x] Phase 6: Step 6.2 (Technical SEO, OpenGraph & Core Web Vitals - DONE)
-  - [ ] Phase 6: Step 6.3 (Free-Tier Cloud Deployment Research & `deploy_plan.md`)
+  - [x] Phase 6: Step 6.3 (Production Dockerfile & Docker Compose Integration for `apps/web` - DONE)
+  - [ ] Phase 6: Step 6.4 (Free-Tier Cloud Deployment Research & `deploy_plan.md`)
+  - [ ] Phase 6: Step 6.5 (Telegram `@BotFather` Setup Guide & Interactive Verification)
 
 ---
 
@@ -87,6 +89,7 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
 - **Coffee Inventory Data Strategy:** Ingest real ICE Certified Robusta Stocks (`ice_robusta_stocks`, 1 lot = 10 tonnes) from external source (Primary: ICE Report Center `https://www.ice.com/report/173`; Fallback: `vietnambiz.vn` daily market report / stale-flag retention), combined with Calendar Spread (M1-M6) & Regime in `InsightsModule` (Confirmed for Phase 5)
 - **UX Redesign Theme & Layout:** Option B — Light Editorial (`stone-50`/`white` + `amber-*` coffee accent), essential-info-first across 5 tiers; Telegram onboarding placed in both Header CTA modal and Tier 4 section (`@minhmh_coffee_tracker_bot` + scannable QR SVG) (Confirmed in Step 5.4)
 - **Stitch AI Editorial System & Senior Overrides:** Integrated from `docs/design/stitch/stitch_vietnamese_coffee_market_dashboard/` (`#FDFBF7` canvas, `#FFFFFF` cards, `#166534`/`#991B1B` accents, `Newsreader`/`Inter`/`JetBrains Mono` fonts); Choice B (always-expanded bottom `SignalsTable` & `AuditTrailSection`); direct `%` formatting for `wf_mape_*` matching `forecast_runs` (`1.36`, `2.45`, `5.68`) (Confirmed in Step 6.1)
+- **Web Dockerization (`coffee_tracker_web`):** Standalone Next.js on `3000:3000`, `NEXT_PUBLIC_API_URL=http://localhost:3001`, `NEXT_PUBLIC_SITE_URL=http://localhost:3000`, `INTERNAL_API_URL=http://orchestrator:3001` (Confirmed in Step 6.3)
 ---
 
 ## 4. Active Architecture State `[AUTO-UPDATE]`
@@ -96,6 +99,7 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
   - `coffee_tracker_redis` (Redis 7 on port 6379) — Healthy
   - `coffee_tracker_orchestrator` (NestJS on port 3001) — Healthy
   - `coffee_tracker_ml_service` (FastAPI on port 8000) — Healthy (Pytest 19/19 tests PASS, Live 200 response ~10.6s)
+  - `coffee_tracker_web` (Next.js 15 Standalone on port 3000, non-root `nextjs:nodejs`, image `282MB`) — Healthy
 - **Database Tables Created & Active (PostgreSQL 17):**
   - `raw_market_prices`: **3,248 continuous records** (2018-01-01 to 2026-11-22).
   - `macro_climate_monthly`: **107 continuous monthly records** (2018-01-01 to 2026-11-01).
@@ -185,3 +189,4 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
 | `STEP 5.4` | 2026-11-25 | Light Editorial 5-tier UX redesign, QR Telegram onboarding, MAPE % fix, `next build` & backend API/DB E2E PASS | [step_5_4_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_5_4_report.md) |
 | `STEP 6.1` | 2026-11-25 | Integrated Stitch AI Light-Editorial (`#FDFBF7`, `Newsreader`/`Inter`), 4 Hard Overrides, `icon.svg`, zero-warning `lint` & `build` PASS | [step_6_1_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_6_1_report.md) |
 | `STEP 6.2` | 2026-11-25 | SEO Metadata, dynamic `robots.ts`/`sitemap.ts`/`opengraph-image.tsx`, JSON-LD, SSR hydration (CLS=0), Lighthouse 100 SEO/A11y/BP PASS | [step_6_2_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_6_2_report.md) |
+| `STEP 6.3` | 2026-11-25 | Next.js standalone Dockerfile (`node:20-alpine` runner, 282MB), `coffee_tracker_web` in Compose, 5/5 containers Healthy PASS | [step_6_3_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_6_3_report.md) |
