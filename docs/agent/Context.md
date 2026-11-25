@@ -24,8 +24,8 @@
 ## 2. Current Progress Tracker `[AUTO-UPDATE]`
 
 - **Active Phase:** Phase 6 — Editorial UI Integration (Stitch), SEO Optimization & Free-Tier Deployment Plan
-- **Last Completed Step:** `STEP 6.3` (Production Standalone Dockerfile & 5-Container Docker Compose Integration)
-- **Next Step to Execute:** `STEP 6.4` (Free-Tier Cloud Deployment Feasibility Research & `deploy_plan.md`)
+- **Last Completed Step:** `STEP 6.4` (Free-Tier Cloud Deployment Feasibility Research & `deploy_plan.md`)
+- **Next Step to Execute:** `STEP 6.5` (Telegram `@BotFather` Configuration Guide & Interactive Command Verification)
 - **Overall Status:**
   - [x] Phase 0: Step 0.1 (Monorepo & Docker - DONE)
   - [x] Phase 0: Step 0.2 (DB Schema & Prisma - DONE)
@@ -48,7 +48,7 @@
   - [x] Phase 6: Step 6.1 (Stitch AI Light-Editorial Redesign & Senior Hard Overrides - DONE)
   - [x] Phase 6: Step 6.2 (Technical SEO, OpenGraph & Core Web Vitals - DONE)
   - [x] Phase 6: Step 6.3 (Production Dockerfile & Docker Compose Integration for `apps/web` - DONE)
-  - [ ] Phase 6: Step 6.4 (Free-Tier Cloud Deployment Research & `deploy_plan.md`)
+  - [x] Phase 6: Step 6.4 (Free-Tier Cloud Deployment Research & `deploy_plan.md` - DONE)
   - [ ] Phase 6: Step 6.5 (Telegram `@BotFather` Setup Guide & Interactive Verification)
 
 ---
@@ -90,6 +90,7 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
 - **UX Redesign Theme & Layout:** Option B — Light Editorial (`stone-50`/`white` + `amber-*` coffee accent), essential-info-first across 5 tiers; Telegram onboarding placed in both Header CTA modal and Tier 4 section (`@minhmh_coffee_tracker_bot` + scannable QR SVG) (Confirmed in Step 5.4)
 - **Stitch AI Editorial System & Senior Overrides:** Integrated from `docs/design/stitch/stitch_vietnamese_coffee_market_dashboard/` (`#FDFBF7` canvas, `#FFFFFF` cards, `#166534`/`#991B1B` accents, `Newsreader`/`Inter`/`JetBrains Mono` fonts); Choice B (always-expanded bottom `SignalsTable` & `AuditTrailSection`); direct `%` formatting for `wf_mape_*` matching `forecast_runs` (`1.36`, `2.45`, `5.68`) (Confirmed in Step 6.1)
 - **Web Dockerization (`coffee_tracker_web`):** Standalone Next.js on `3000:3000`, `NEXT_PUBLIC_API_URL=http://localhost:3001`, `NEXT_PUBLIC_SITE_URL=http://localhost:3000`, `INTERNAL_API_URL=http://orchestrator:3001` (Confirmed in Step 6.3)
+- **Free-Tier Deployment Constraint:** Strictly zero credit card (`Option A`: Vercel + Neon + Upstash + Render Free + Hugging Face Spaces + GitHub Actions Cron + Telegram Webhook); personal scale `< 100` daily visits, `< 20` Telegram subscribers; blueprint documented in `deploy_plan.md` (Confirmed in Step 6.4)
 ---
 
 ## 4. Active Architecture State `[AUTO-UPDATE]`
@@ -190,3 +191,4 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
 | `STEP 6.1` | 2026-11-25 | Integrated Stitch AI Light-Editorial (`#FDFBF7`, `Newsreader`/`Inter`), 4 Hard Overrides, `icon.svg`, zero-warning `lint` & `build` PASS | [step_6_1_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_6_1_report.md) |
 | `STEP 6.2` | 2026-11-25 | SEO Metadata, dynamic `robots.ts`/`sitemap.ts`/`opengraph-image.tsx`, JSON-LD, SSR hydration (CLS=0), Lighthouse 100 SEO/A11y/BP PASS | [step_6_2_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_6_2_report.md) |
 | `STEP 6.3` | 2026-11-25 | Next.js standalone Dockerfile (`node:20-alpine` runner, 282MB), `coffee_tracker_web` in Compose, 5/5 containers Healthy PASS | [step_6_3_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_6_3_report.md) |
+| `STEP 6.4` | 2026-11-25 | 5-container resource benchmark (idle 409MiB, ML peak 171.7MiB/554% CPU), no-card $0 architecture blueprint in `deploy_plan.md` | [step_6_4_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_6_4_report.md) |
