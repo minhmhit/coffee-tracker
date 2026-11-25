@@ -1,7 +1,7 @@
 import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
 import { Logger } from '@nestjs/common';
-import { INGESTION_QUEUE_NAME } from '../ingestion.constants';
+import { INGESTION_JOBS, INGESTION_QUEUE_NAME } from '../ingestion.constants';
 import { IngestionService } from '../ingestion.service';
 
 export interface IngestionJobPayload {
@@ -19,17 +19,25 @@ export class IngestionProcessor extends WorkerHost {
 
   /**
    * Worker handler triggered by BullMQ queue.
+   * Dispatches either daily market price scraping or monthly climate synchronization.
    */
-  async process(job: Job<IngestionJobPayload, any, string>): Promise<{
-    success: boolean;
-    recordId: number;
-    date: string;
-    daklak: string;
-  }> {
+  async process(job: Job<IngestionJobPayload, any, string>): Promise<any> {
     this.logger.log(
       `Processing ingestion job ${job.id} [${job.name}], trigger: ${job.data?.trigger || 'manual'}, attempt: ${job.attemptsMade + 1}/${job.opts.attempts || 5}`,
     );
 
+    // 1. Monthly Climate Indicator Sync (NOAA ONI + Open-Meteo Rainfall Anomalies)
+    if (job.name === INGESTION_JOBS.MONTHLY_CLIMATE) {
+      this.logger.log('Executing monthly macro climate synchronization job...');
+      const syncResult = await this.ingestionService.syncMacroClimateMonthly();
+      return {
+        success: true,
+        type: 'monthly_climate',
+        ...syncResult,
+      };
+    }
+
+    // 2. Daily Market Price Ingestion (Domestic + London + FX + Oil)
     const { snapshot, sanityResult, errors } = await this.ingestionService.fetchDailySnapshot(
       job.data?.targetDate,
     );
@@ -46,6 +54,7 @@ export class IngestionProcessor extends WorkerHost {
 
     return {
       success: true,
+      type: 'daily_market_price',
       recordId: record.id,
       date: snapshot.date,
       daklak: record.price_daklak.toString(),
@@ -60,7 +69,7 @@ export class IngestionProcessor extends WorkerHost {
 
     if (job.attemptsMade >= (job.opts.attempts || 5)) {
       this.logger.error(
-        `[CRITICAL ALERT] Ingestion job ${job.id} permanently failed after ${job.attemptsMade} attempts! Reason: ${error.message}. Ready for Telegram alert dispatch.`,
+        `[CRITICAL ALERT] Ingestion job ${job.id} [${job.name}] permanently failed after ${job.attemptsMade} attempts! Reason: ${error.message}. Ready for Telegram alert dispatch.`,
       );
     }
   }
@@ -68,7 +77,7 @@ export class IngestionProcessor extends WorkerHost {
   @OnWorkerEvent('completed')
   onJobCompleted(job: Job<IngestionJobPayload>, result: any) {
     this.logger.log(
-      `Job ${job.id} [${job.name}] successfully finished. Date: ${result?.date}, Record ID: ${result?.recordId}`,
+      `Job ${job.id} [${job.name}] successfully finished. Type: ${result?.type}, Details: ${JSON.stringify(result)}`,
     );
   }
 }

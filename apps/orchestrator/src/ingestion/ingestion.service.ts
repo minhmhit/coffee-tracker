@@ -1,10 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Prisma, RawMarketPrice } from '@prisma/client';
+import { Prisma, RawMarketPrice, MacroClimateMonthly } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { DomesticCoffeeAdapter } from './adapters/domestic-coffee.adapter';
 import { LondonRobustaAdapter } from './adapters/london-robusta.adapter';
 import { ExchangeRateAdapter } from './adapters/exchange-rate.adapter';
 import { BrentOilAdapter } from './adapters/brent-oil.adapter';
+import { NoaaOniAdapter } from './adapters/noaa-oni.adapter';
+import { OpenMeteoAdapter, CLIMATE_LOCATIONS } from './adapters/open-meteo.adapter';
 import { PriceSanityValidator, SanityCheckOptions, SanityCheckResult } from './validators/price-sanity.validator';
 import { DailyMarketSnapshot } from './types/market-data.types';
 
@@ -17,6 +19,8 @@ export class IngestionService {
     private readonly londonAdapter: LondonRobustaAdapter,
     private readonly fxAdapter: ExchangeRateAdapter,
     private readonly oilAdapter: BrentOilAdapter,
+    private readonly noaaAdapter: NoaaOniAdapter,
+    private readonly openMeteoAdapter: OpenMeteoAdapter,
     private readonly validator: PriceSanityValidator,
     private readonly prisma: PrismaService,
   ) {}
@@ -146,5 +150,87 @@ export class IngestionService {
 
     if (!latest) return null;
     return latest.price_daklak.toNumber();
+  }
+
+  /**
+   * Synchronizes monthly macro & climate indicators (NOAA ONI + Open-Meteo Rainfall Anomalies)
+   * into the macro_climate_monthly table.
+   * Conforms strictly to Single Writer Principle, Idempotency, and Zero Float Principle.
+   */
+  async syncMacroClimateMonthly(startYear = 2018): Promise<{
+    syncedCount: number;
+    earliestDate?: string;
+    latestDate?: string;
+    latestOni?: number;
+  }> {
+    this.logger.log(`Starting macro climate monthly synchronization from year ${startYear}...`);
+
+    // 1. Fetch NOAA ONI and Open-Meteo rainfall anomalies in parallel
+    const [noaaRes, vnAnomalies, brAnomalies] = await Promise.all([
+      this.noaaAdapter.fetch(),
+      this.openMeteoAdapter.getHistoricalAnomalies(CLIMATE_LOCATIONS.DAKLAK),
+      this.openMeteoAdapter.getHistoricalAnomalies(CLIMATE_LOCATIONS.BRAZIL),
+    ]);
+
+    const onis = noaaRes.data;
+
+    // 2. Build complete list of monthly keys (YYYY-MM-01) from startYear to current month
+    const now = new Date();
+    const currentYear = now.getUTCFullYear();
+    const currentMonth = now.getUTCMonth() + 1; // 1-12
+
+    const monthKeys: string[] = [];
+    for (let y = startYear; y <= currentYear; y++) {
+      const maxM = y === currentYear ? currentMonth : 12;
+      for (let m = 1; m <= maxM; m++) {
+        const mStr = m < 10 ? `0${m}` : `${m}`;
+        monthKeys.push(`${y}-${mStr}-01`);
+      }
+    }
+
+    this.logger.log(`Upserting ${monthKeys.length} monthly climate records into PostgreSQL...`);
+
+    let syncedCount = 0;
+    let latestOni: number | undefined;
+
+    for (const monthStr of monthKeys) {
+      const dateObj = new Date(`${monthStr}T00:00:00.000Z`);
+
+      const oniVal = onis.get(monthStr);
+      const vnVal = vnAnomalies.get(monthStr);
+      const brVal = brAnomalies.get(monthStr);
+
+      if (oniVal !== undefined) {
+        latestOni = oniVal;
+      }
+
+      await this.prisma.macroClimateMonthly.upsert({
+        where: { month_date: dateObj },
+        update: {
+          oni_index: oniVal !== undefined ? new Prisma.Decimal(oniVal) : undefined,
+          vn_rain_anomaly: vnVal !== undefined ? new Prisma.Decimal(vnVal) : undefined,
+          br_rain_anomaly: brVal !== undefined ? new Prisma.Decimal(brVal) : undefined,
+        },
+        create: {
+          month_date: dateObj,
+          oni_index: oniVal !== undefined ? new Prisma.Decimal(oniVal) : null,
+          vn_rain_anomaly: vnVal !== undefined ? new Prisma.Decimal(vnVal) : null,
+          br_rain_anomaly: brVal !== undefined ? new Prisma.Decimal(brVal) : null,
+        },
+      });
+
+      syncedCount++;
+    }
+
+    this.logger.log(
+      `Macro climate sync completed! Synced ${syncedCount} months (${monthKeys[0]} to ${monthKeys[monthKeys.length - 1]})`,
+    );
+
+    return {
+      syncedCount,
+      earliestDate: monthKeys[0],
+      latestDate: monthKeys[monthKeys.length - 1],
+      latestOni,
+    };
   }
 }

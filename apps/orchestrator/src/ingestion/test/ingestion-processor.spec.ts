@@ -7,7 +7,7 @@ import { IngestionService } from '../ingestion.service';
 import { INGESTION_CRONS, INGESTION_JOBS, INGESTION_QUEUE_NAME } from '../ingestion.constants';
 import { Prisma } from '@prisma/client';
 
-describe('IngestionProcessor & Scheduler Suite (Step 1.2)', () => {
+describe('IngestionProcessor & Scheduler Suite (Step 1.2 & 1.3)', () => {
   let processor: IngestionProcessor;
   let scheduler: IngestionScheduler;
   let ingestionService: jest.Mocked<Partial<IngestionService>>;
@@ -62,12 +62,13 @@ describe('IngestionProcessor & Scheduler Suite (Step 1.2)', () => {
       fetchDailySnapshot: jest.fn(),
       upsertDailySnapshot: jest.fn(),
       getLatestDaklakPrice: jest.fn(),
+      syncMacroClimateMonthly: jest.fn(),
     };
 
     queueMock = {
       add: jest.fn().mockResolvedValue({ id: 'job-1' } as any),
       upsertJobScheduler: jest.fn().mockResolvedValue({} as any),
-      getJobSchedulersCount: jest.fn().mockResolvedValue(2),
+      getJobSchedulersCount: jest.fn().mockResolvedValue(3),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -90,7 +91,7 @@ describe('IngestionProcessor & Scheduler Suite (Step 1.2)', () => {
   });
 
   describe('1. IngestionProcessor', () => {
-    it('should successfully process a valid ingestion job and perform idempotent upsert', async () => {
+    it('should successfully process a valid daily ingestion job and perform idempotent upsert', async () => {
       ingestionService.fetchDailySnapshot!.mockResolvedValue({
         snapshot: mockSnapshot,
         sanityResult: { valid: true, reasons: [] },
@@ -113,6 +114,30 @@ describe('IngestionProcessor & Scheduler Suite (Step 1.2)', () => {
       expect(result.daklak).toBe('71800');
       expect(ingestionService.fetchDailySnapshot).toHaveBeenCalledTimes(1);
       expect(ingestionService.upsertDailySnapshot).toHaveBeenCalledWith(mockSnapshot);
+    });
+
+    it('should successfully process monthly climate sync job', async () => {
+      ingestionService.syncMacroClimateMonthly!.mockResolvedValue({
+        syncedCount: 107,
+        earliestDate: '2018-01-01',
+        latestDate: '2026-11-01',
+        latestOni: 2.46,
+      });
+
+      const job = {
+        id: 'job-climate-1',
+        name: INGESTION_JOBS.MONTHLY_CLIMATE,
+        data: { trigger: 'cron_monthly_climate_05_0300' },
+        attemptsMade: 0,
+        opts: { attempts: 5 },
+      } as unknown as Job;
+
+      const result = await processor.process(job as any);
+
+      expect(result.success).toBe(true);
+      expect(result.type).toBe('monthly_climate');
+      expect(result.syncedCount).toBe(107);
+      expect(ingestionService.syncMacroClimateMonthly).toHaveBeenCalledTimes(1);
     });
 
     it('should throw an Error to trigger BullMQ retry when sanity validation rejects snapshot', async () => {
@@ -154,12 +179,12 @@ describe('IngestionProcessor & Scheduler Suite (Step 1.2)', () => {
   });
 
   describe('2. IngestionScheduler', () => {
-    it('should register both 08:30 morning domestic and 01:00 London close schedulers on module init', async () => {
+    it('should register morning domestic, London close, and monthly climate repeatable jobs on module init', async () => {
       await scheduler.onModuleInit();
 
-      expect(queueMock.upsertJobScheduler).toHaveBeenCalledTimes(2);
+      expect(queueMock.upsertJobScheduler).toHaveBeenCalledTimes(3);
 
-      // Check first call: Morning Central Highlands cron
+      // 1. Morning Central Highlands cron
       expect(queueMock.upsertJobScheduler).toHaveBeenNthCalledWith(
         1,
         'morning_domestic_0830',
@@ -170,13 +195,10 @@ describe('IngestionProcessor & Scheduler Suite (Step 1.2)', () => {
         expect.objectContaining({
           name: INGESTION_JOBS.DAILY_MARKET_DATA,
           data: { trigger: 'cron_morning_domestic_0830' },
-          opts: expect.objectContaining({
-            attempts: 5,
-          }),
         }),
       );
 
-      // Check second call: ICE London close cron
+      // 2. ICE London close cron
       expect(queueMock.upsertJobScheduler).toHaveBeenNthCalledWith(
         2,
         'night_london_close_0100',
@@ -187,9 +209,20 @@ describe('IngestionProcessor & Scheduler Suite (Step 1.2)', () => {
         expect.objectContaining({
           name: INGESTION_JOBS.DAILY_MARKET_DATA,
           data: { trigger: 'cron_night_london_close_0100' },
-          opts: expect.objectContaining({
-            attempts: 5,
-          }),
+        }),
+      );
+
+      // 3. Monthly Climate cron (05th at 03:00)
+      expect(queueMock.upsertJobScheduler).toHaveBeenNthCalledWith(
+        3,
+        'monthly_climate_05_0300',
+        {
+          pattern: INGESTION_CRONS.MONTHLY_CLIMATE,
+          tz: INGESTION_CRONS.TIMEZONE,
+        },
+        expect.objectContaining({
+          name: INGESTION_JOBS.MONTHLY_CLIMATE,
+          data: { trigger: 'cron_monthly_climate_05_0300' },
         }),
       );
     });
@@ -202,6 +235,20 @@ describe('IngestionProcessor & Scheduler Suite (Step 1.2)', () => {
         {
           trigger: 'manual_dispatch',
           targetDate: '2026-11-22',
+        },
+        expect.objectContaining({
+          attempts: 5,
+        }),
+      );
+    });
+
+    it('should allow immediate climate sync job dispatch', async () => {
+      await scheduler.triggerImmediateClimateSync();
+
+      expect(queueMock.add).toHaveBeenCalledWith(
+        INGESTION_JOBS.MONTHLY_CLIMATE,
+        {
+          trigger: 'manual_dispatch',
         },
         expect.objectContaining({
           attempts: 5,

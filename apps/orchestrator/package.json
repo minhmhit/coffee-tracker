@@ -10,7 +10,8 @@
     "start:prod": "node dist/main",
     "test": "jest",
     "dry-run": "ts-node src/ingestion/scripts/dry-run.ts",
-    "backfill": "ts-node src/ingestion/scripts/backfill-history.ts"
+    "backfill": "ts-node src/ingestion/scripts/backfill-history.ts",
+    "backfill:climate": "ts-node src/ingestion/scripts/backfill-climate.ts"
   },
   "dependencies": {
     "@nestjs/bullmq": "^11.0.5",

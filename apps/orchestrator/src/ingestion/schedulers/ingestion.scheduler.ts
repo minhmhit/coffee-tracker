@@ -23,8 +23,10 @@ export class IngestionScheduler implements OnModuleInit {
   }
 
   /**
-   * Registers BullMQ repeatable cron jobs for domestic morning and ICE night sessions
-   * using BullMQ v5 Job Schedulers API.
+   * Registers BullMQ repeatable cron jobs for:
+   *  1. Central Highlands morning domestic prices (08:30 VN)
+   *  2. ICE London Robusta night close (01:00 VN)
+   *  3. NOAA ONI & Rainfall Anomalies monthly sync (03:00 VN on 5th of every month)
    */
   async registerRepeatableJobs() {
     try {
@@ -74,6 +76,28 @@ export class IngestionScheduler implements OnModuleInit {
         `Scheduled [${INGESTION_JOBS.DAILY_MARKET_DATA}] at ${INGESTION_CRONS.NIGHT_LONDON_CLOSE} (${INGESTION_CRONS.TIMEZONE})`,
       );
 
+      // 3. Monthly Macro Climate Ingestion (03:00 on the 5th of each month)
+      await this.ingestionQueue.upsertJobScheduler(
+        'monthly_climate_05_0300',
+        {
+          pattern: INGESTION_CRONS.MONTHLY_CLIMATE,
+          tz: INGESTION_CRONS.TIMEZONE,
+        },
+        {
+          name: INGESTION_JOBS.MONTHLY_CLIMATE,
+          data: { trigger: 'cron_monthly_climate_05_0300' },
+          opts: {
+            attempts: INGESTION_JOB_OPTIONS.attempts,
+            backoff: INGESTION_JOB_OPTIONS.backoff,
+            removeOnComplete: INGESTION_JOB_OPTIONS.removeOnComplete,
+            removeOnFail: INGESTION_JOB_OPTIONS.removeOnFail,
+          },
+        },
+      );
+      this.logger.log(
+        `Scheduled [${INGESTION_JOBS.MONTHLY_CLIMATE}] at ${INGESTION_CRONS.MONTHLY_CLIMATE} (${INGESTION_CRONS.TIMEZONE})`,
+      );
+
       const count = await this.ingestionQueue.getJobSchedulersCount();
       this.logger.log(`Active job schedulers in '${INGESTION_QUEUE_NAME}': ${count}`);
     } catch (error: any) {
@@ -82,7 +106,7 @@ export class IngestionScheduler implements OnModuleInit {
   }
 
   /**
-   * Helper to manually dispatch an immediate ingestion job (e.g. for testing, backfill, or user request).
+   * Helper to manually dispatch an immediate daily market price ingestion job.
    */
   async triggerImmediateIngestion(targetDate?: string) {
     this.logger.log(`Triggering immediate ingestion job (targetDate: ${targetDate || 'today'})...`);
@@ -91,6 +115,23 @@ export class IngestionScheduler implements OnModuleInit {
       {
         trigger: 'manual_dispatch',
         targetDate,
+      },
+      {
+        attempts: INGESTION_JOB_OPTIONS.attempts,
+        backoff: INGESTION_JOB_OPTIONS.backoff,
+      },
+    );
+  }
+
+  /**
+   * Helper to manually dispatch an immediate monthly climate sync job.
+   */
+  async triggerImmediateClimateSync() {
+    this.logger.log('Triggering immediate monthly climate sync job...');
+    return this.ingestionQueue.add(
+      INGESTION_JOBS.MONTHLY_CLIMATE,
+      {
+        trigger: 'manual_dispatch',
       },
       {
         attempts: INGESTION_JOB_OPTIONS.attempts,
