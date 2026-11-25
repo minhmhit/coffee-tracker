@@ -130,6 +130,7 @@ describe('Telegram Onboarding & Enriched Morning Briefing (Step 5.3)', () => {
       sendMessageToChat: jest.fn().mockResolvedValue({ success: true, messageId: 202 }),
       getBotProfile: jest.fn().mockResolvedValue({ username: 'minhmh_coffee_tracker_bot' }),
       getUpdates: jest.fn().mockResolvedValue([]),
+      setMyCommands: jest.fn().mockResolvedValue({ success: true }),
     };
 
     alertQueueMock = {
@@ -302,6 +303,25 @@ describe('Telegram Onboarding & Enriched Morning Briefing (Step 5.3)', () => {
       expect(info.commands).toHaveLength(3);
       expect(info.sampleMessagePreview).toContain('1. GIÁ CÀ PHÊ HÔM NAY');
       expect(info.sampleMessagePreview).not.toContain('<b>');
+    });
+  });
+
+  describe('5. Step 6.5 - Telegram setMyCommands Sync', () => {
+    it('should sync /start, /today, /stop Vietnamese commands cleanly via TelegramService.setMyCommands', async () => {
+      const result = await botService.syncBotCommands();
+      expect(result).toEqual({ success: true });
+      expect(telegramService.setMyCommands).toHaveBeenCalledWith([
+        expect.objectContaining({ command: 'start' }),
+        expect.objectContaining({ command: 'today' }),
+        expect.objectContaining({ command: 'stop' }),
+      ]);
+    });
+
+    it('should handle Telegram setMyCommands network errors non-blockingly without throwing', async () => {
+      telegramService.setMyCommands.mockRejectedValueOnce(new Error('Network timeout'));
+      const result = await botService.syncBotCommands();
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Network timeout');
     });
   });
 });

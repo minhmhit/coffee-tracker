@@ -13,6 +13,11 @@ export interface TelegramBotProfile {
   firstName?: string;
 }
 
+export interface TelegramBotCommand {
+  command: string;
+  description: string;
+}
+
 @Injectable()
 export class TelegramService {
   private readonly logger = new Logger(TelegramService.name);
@@ -243,6 +248,55 @@ export class TelegramService {
       if (signal) {
         signal.removeEventListener('abort', onParentAbort);
       }
+    }
+  }
+
+  /**
+   * Synchronizes the clickable slash-command menu in Telegram client apps via `setMyCommands`.
+   */
+  async setMyCommands(
+    commands: TelegramBotCommand[],
+  ): Promise<{ success: boolean; error?: string }> {
+    const token = this.getBotToken();
+    if (!token || token.includes('your_telegram_bot_token')) {
+      return { success: false, error: 'Telegram bot token not configured' };
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+    try {
+      const response = await fetch(
+        `https://api.telegram.org/bot${token}/setMyCommands`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'User-Agent': 'CoffeeTracker-TelegramService/1.0',
+          },
+          body: JSON.stringify({ commands }),
+          signal: controller.signal,
+        },
+      );
+      clearTimeout(timeoutId);
+
+      const json = await response.json();
+      if (!response.ok || !json.ok) {
+        const desc = json?.description || `HTTP ${response.status}`;
+        this.logger.warn(`Telegram setMyCommands failed: ${desc}`);
+        return { success: false, error: desc };
+      }
+
+      this.logger.log(
+        `Telegram setMyCommands succeeded (${commands.map((c) => `/${c.command}`).join(', ')})`,
+      );
+      return { success: true };
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      const errMsg =
+        err.name === 'AbortError' ? 'Connection timeout (8s)' : err.message;
+      this.logger.warn(`Telegram setMyCommands error: ${errMsg}`);
+      return { success: false, error: errMsg };
     }
   }
 }

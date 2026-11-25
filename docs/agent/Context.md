@@ -23,9 +23,9 @@
 
 ## 2. Current Progress Tracker `[AUTO-UPDATE]`
 
-- **Active Phase:** Phase 5 — Live Weather, Explainable Insights, Telegram Onboarding & UX Redesign (`COMPLETED`)
-- **Last Completed Step:** `STEP 5.4` (Frontend Light Editorial UX Redesign & E2E Stack Smoke Test)
-- **Next Step to Execute:** Phase 6 — UI Refinement (theo yêu cầu tinh chỉnh giao diện của User)
+- **Active Phase:** Phase 6 — Editorial UI Integration (Stitch), SEO Optimization & Deployment Readiness (`ALL PHASES COMPLETE`)
+- **Last Completed Step:** `STEP 6.5` (Telegram Bot `@BotFather` Guide, `setMyCommands` Auto-Sync & Interactive Verification)
+- **Next Step to Execute:** `NONE — ALL PHASES (0–6) COMPLETE`
 - **Overall Status:**
   - [x] Phase 0: Step 0.1 (Monorepo & Docker - DONE)
   - [x] Phase 0: Step 0.2 (DB Schema & Prisma - DONE)
@@ -45,6 +45,11 @@
   - [x] Phase 5: Step 5.2 (Explainable Insights - DONE)
   - [x] Phase 5: Step 5.3 (Telegram Self-Service & Enriched Briefing - DONE)
   - [x] Phase 5: Step 5.4 (UX Redesign & E2E Smoke Test - DONE)
+  - [x] Phase 6: Step 6.1 (Stitch AI Light-Editorial Redesign & Senior Hard Overrides - DONE)
+  - [x] Phase 6: Step 6.2 (Technical SEO, OpenGraph & Core Web Vitals - DONE)
+  - [x] Phase 6: Step 6.3 (Production Dockerfile & Docker Compose Integration for `apps/web` - DONE)
+  - [x] Phase 6: Step 6.4 (Free-Tier Cloud Deployment Research & `deploy_plan.md` - DONE)
+  - [x] Phase 6: Step 6.5 (Telegram `@BotFather` Setup Guide & Interactive Verification - DONE)
 
 ---
 
@@ -83,6 +88,9 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
 - **Telegram Self-Service Bot:** Option A — Long-Polling (`getUpdates`) inside NestJS HTTP server with `OnModuleDestroy` + `dns.setDefaultResultOrder('ipv4first')`; bot username `@minhmh_coffee_tracker_bot` via `getMe` + `TELEGRAM_BOT_USERNAME` (Confirmed in Step 5.3)
 - **Coffee Inventory Data Strategy:** Ingest real ICE Certified Robusta Stocks (`ice_robusta_stocks`, 1 lot = 10 tonnes) from external source (Primary: ICE Report Center `https://www.ice.com/report/173`; Fallback: `vietnambiz.vn` daily market report / stale-flag retention), combined with Calendar Spread (M1-M6) & Regime in `InsightsModule` (Confirmed for Phase 5)
 - **UX Redesign Theme & Layout:** Option B — Light Editorial (`stone-50`/`white` + `amber-*` coffee accent), essential-info-first across 5 tiers; Telegram onboarding placed in both Header CTA modal and Tier 4 section (`@minhmh_coffee_tracker_bot` + scannable QR SVG) (Confirmed in Step 5.4)
+- **Stitch AI Editorial System & Senior Overrides:** Integrated from `docs/design/stitch/stitch_vietnamese_coffee_market_dashboard/` (`#FDFBF7` canvas, `#FFFFFF` cards, `#166534`/`#991B1B` accents, `Newsreader`/`Inter`/`JetBrains Mono` fonts); Choice B (always-expanded bottom `SignalsTable` & `AuditTrailSection`); direct `%` formatting for `wf_mape_*` matching `forecast_runs` (`1.36`, `2.45`, `5.68`) (Confirmed in Step 6.1)
+- **Web Dockerization (`coffee_tracker_web`):** Standalone Next.js on `3000:3000`, `NEXT_PUBLIC_API_URL=http://localhost:3001`, `NEXT_PUBLIC_SITE_URL=http://localhost:3000`, `INTERNAL_API_URL=http://orchestrator:3001` (Confirmed in Step 6.3)
+- **Free-Tier Deployment Constraint:** Strictly zero credit card (`Option A`: Vercel + Neon + Upstash + Render Free + Hugging Face Spaces + GitHub Actions Cron + Telegram Webhook); personal scale `< 100` daily visits, `< 20` Telegram subscribers; blueprint documented in `deploy_plan.md` (Confirmed in Step 6.4)
 ---
 
 ## 4. Active Architecture State `[AUTO-UPDATE]`
@@ -92,15 +100,16 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
   - `coffee_tracker_redis` (Redis 7 on port 6379) — Healthy
   - `coffee_tracker_orchestrator` (NestJS on port 3001) — Healthy
   - `coffee_tracker_ml_service` (FastAPI on port 8000) — Healthy (Pytest 19/19 tests PASS, Live 200 response ~10.6s)
+  - `coffee_tracker_web` (Next.js 15 Standalone on port 3000, non-root `nextjs:nodejs`, image `282MB`) — Healthy
 - **Database Tables Created & Active (PostgreSQL 17):**
   - `raw_market_prices`: **3,248 continuous records** (2018-01-01 to 2026-11-22).
   - `macro_climate_monthly`: **107 continuous monthly records** (2018-01-01 to 2026-11-01).
   - `daily_signals`: **3,248 continuous records** (2018-01-01 to 2026-11-22). Columns: `signal_date`, `basis`, `spread`, `volatility_30d`, `z_score`, `is_anomaly`, `regime`, `notes`, timestamps.
-  - `forecast_runs`: **3 records** (`SUCCESS` forecasts stored in PostgreSQL).
-  - `forecast_predictions`: **26 records** ($h = 1..26$, $P_{10}, P_{50}, P_{90}$, Naive RW, Futures baseline).
+  - `forecast_runs`: **4 records** (`SUCCESS` forecasts stored in PostgreSQL).
+  - `forecast_predictions`: **26 records** per run ($h = 1..26$, $P_{10}, P_{50}, P_{90}$, Naive RW, Futures baseline).
   - `daily_weather`: **4 records** for `2026-11-25` (`DAKLAK`, `LAMDONG`, `GIALAI`, `DAKNONG`).
   - `ice_robusta_stocks`: **1 record** (`2026-11-24`, `5,791` lots / `57,910` tonnes via `vietnambiz.vn` fallback).
-  - `telegram_subscribers`: **0 records** (Target for Step 5.3 onboarding).
+  - `telegram_subscribers`: **2 records** verified live (`7583239264` `is_active=true`, `-5371622980` `is_active=false`).
 - **BullMQ Queues Active:**
   - `ingestion-queue`: 4 repeatable schedulers:
     1. `morning_domestic_0830` (`30 8 * * *` Asia/Ho_Chi_Minh)
@@ -140,7 +149,7 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
   - `GET /api/stocks/robusta/history` (Historical ICE Certified Robusta stocks ?days=90)
   - `GET /api/insights/latest` (Explainable insights for Oil, ICE Stocks/Supply, FX, Weather/Climate + Forecast transparency)
 - **NextJS Frontend Active:**
-  - `http://localhost:3000` (Next.js 15 App Router — Light Editorial 5-Tier Dashboard: Price Hero, Weather Today, Market Insights & Forecast Transparency Fan Chart, Telegram QR Onboarding + Modal, Price History, Signals & Audit Trail with fixed MAPE `%`)
+  - `http://localhost:3000` (Next.js 15 Dynamic SSR App Router — Stitch AI Light-Editorial, full SEO `Metadata` + `opengraph-image.tsx` + `robots.ts` + `sitemap.ts` + JSON-LD, CLS=0, Lighthouse SEO 100 / A11y 100 / BP 100)
 - **NestJS Modules Active:** `HealthModule`, `PrismaModule` (Global), `IngestionModule`, `SignalsModule`, `AlertsModule`, `ForecastModule`, `InsightsModule`
 
 ---
@@ -179,3 +188,8 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
 | `STEP 5.2` | 2026-11-25 | InsightsModule (Oil, ICE Stocks/Supply, FX, Weather/Climate, Forecast Transparency), 10/10 Jest suites (89 tests) PASS, <35ms live | [step_5_2_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_5_2_report.md) |
 | `STEP 5.3` | 2026-11-25 | Telegram Long-Polling bot (@minhmh_coffee_tracker_bot), /start /today /stop, enriched 4-section briefing (Msg 14), 11/11 Jest suites PASS | [step_5_3_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_5_3_report.md) |
 | `STEP 5.4` | 2026-11-25 | Light Editorial 5-tier UX redesign, QR Telegram onboarding, MAPE % fix, `next build` & backend API/DB E2E PASS | [step_5_4_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_5_4_report.md) |
+| `STEP 6.1` | 2026-11-25 | Integrated Stitch AI Light-Editorial (`#FDFBF7`, `Newsreader`/`Inter`), 4 Hard Overrides, `icon.svg`, zero-warning `lint` & `build` PASS | [step_6_1_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_6_1_report.md) |
+| `STEP 6.2` | 2026-11-25 | SEO Metadata, dynamic `robots.ts`/`sitemap.ts`/`opengraph-image.tsx`, JSON-LD, SSR hydration (CLS=0), Lighthouse 100 SEO/A11y/BP PASS | [step_6_2_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_6_2_report.md) |
+| `STEP 6.3` | 2026-11-25 | Next.js standalone Dockerfile (`node:20-alpine` runner, 282MB), `coffee_tracker_web` in Compose, 5/5 containers Healthy PASS | [step_6_3_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_6_3_report.md) |
+| `STEP 6.4` | 2026-11-25 | 5-container resource benchmark (idle 409MiB, ML peak 171.7MiB/554% CPU), no-card $0 architecture blueprint in `deploy_plan.md` | [step_6_4_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_6_4_report.md) |
+| `STEP 6.5` | 2026-11-25 | Telegram `setMyCommands` auto-sync, `docs/telegram_bot_setup.md` guide, live `/start`/`/today`/`/stop` & DB verified, 11/11 Jest suites PASS | [step_6_5_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_6_5_report.md) |

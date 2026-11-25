@@ -7,7 +7,29 @@ module.exports = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        serif: ['var(--font-serif)', 'Georgia', 'serif'],
+        sans: ['var(--font-sans)', 'system-ui', '-apple-system', 'sans-serif'],
+        mono: ['var(--font-mono)', 'ui-monospace', 'SFMono-Regular', 'monospace'],
+      },
       colors: {
+        ivory: {
+          DEFAULT: '#FDFBF7',
+          surface: '#FBF9F5',
+          muted: '#F5F3EF',
+          chip: '#E4E2DE',
+        },
+        forest: {
+          DEFAULT: '#166534',
+          sage: '#3F6A52',
+          soft: '#ECF3EF',
+          border: '#86EFAC',
+        },
+        crimson: {
+          DEFAULT: '#991B1B',
+          soft: '#FEE2E2',
+          border: '#FECACA',
+        },
         coffee: {
           50: '#fbf7f4',
           100: '#f5eee6',
