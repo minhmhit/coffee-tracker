@@ -10,11 +10,15 @@ import { PriceSanityValidator } from './validators/price-sanity.validator';
 import { IngestionService } from './ingestion.service';
 import { IngestionProcessor } from './processors/ingestion.processor';
 import { IngestionScheduler } from './schedulers/ingestion.scheduler';
+import { MarketController } from './market.controller';
+import { ClimateController } from './climate.controller';
+import { PrismaModule } from '../prisma/prisma.module';
 import { INGESTION_QUEUE_NAME } from './ingestion.constants';
 import { ALERT_QUEUE_NAME, SIGNALS_QUEUE_NAME } from '../signals/signals.constants';
 
 @Module({
   imports: [
+    PrismaModule,
     BullModule.registerQueue(
       {
         name: INGESTION_QUEUE_NAME,
@@ -27,6 +31,7 @@ import { ALERT_QUEUE_NAME, SIGNALS_QUEUE_NAME } from '../signals/signals.constan
       },
     ),
   ],
+  controllers: [MarketController, ClimateController],
   providers: [
     DomesticCoffeeAdapter,
     LondonRobustaAdapter,
