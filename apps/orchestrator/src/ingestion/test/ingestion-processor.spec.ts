@@ -66,6 +66,8 @@ describe('IngestionProcessor & Scheduler Suite (Step 1.2 & 1.3)', () => {
       upsertDailySnapshot: jest.fn(),
       getLatestDaklakPrice: jest.fn(),
       syncMacroClimateMonthly: jest.fn(),
+      syncDailyWeather: jest.fn().mockResolvedValue({ success: true, syncedCount: 4 }),
+      syncIceRobustaStocks: jest.fn().mockResolvedValue({ success: true, isStale: false, certifiedLots: 5791 }),
     };
 
     queueMock = {
@@ -169,6 +171,48 @@ describe('IngestionProcessor & Scheduler Suite (Step 1.2 & 1.3)', () => {
       expect(ingestionService.syncMacroClimateMonthly).toHaveBeenCalledTimes(1);
     });
 
+    it('should isolate weather and ICE stocks failures without failing daily market ingestion', async () => {
+      ingestionService.fetchDailySnapshot!.mockResolvedValue({
+        snapshot: mockSnapshot,
+        sanityResult: { valid: true, reasons: [] },
+        errors: [],
+      });
+      ingestionService.upsertDailySnapshot!.mockResolvedValue(mockRecord);
+      ingestionService.syncDailyWeather!.mockRejectedValue(new Error('Open-Meteo timeout'));
+      ingestionService.syncIceRobustaStocks!.mockRejectedValue(new Error('ICE blocked'));
+
+      const job = {
+        id: 'job-isolated-1',
+        name: INGESTION_JOBS.DAILY_MARKET_DATA,
+        data: { trigger: 'cron_morning_domestic_0830' },
+        attemptsMade: 0,
+        opts: { attempts: 5 },
+      } as unknown as Job;
+
+      const result = await processor.process(job as any);
+
+      expect(result.success).toBe(true);
+      expect(result.recordId).toBe(1234);
+      expect(signalsQueueMock.add).toHaveBeenCalledTimes(1);
+    });
+
+    it('should process standalone INGEST_DAILY_WEATHER job', async () => {
+      const job = {
+        id: 'job-weather-0545',
+        name: INGESTION_JOBS.DAILY_WEATHER,
+        data: { trigger: 'cron_early_weather_0545' },
+        attemptsMade: 0,
+        opts: { attempts: 3 },
+      } as unknown as Job;
+
+      const result = await processor.process(job as any);
+
+      expect(result.type).toBe('daily_weather');
+      expect(result.success).toBe(true);
+      expect(result.syncedCount).toBe(4);
+      expect(ingestionService.syncDailyWeather).toHaveBeenCalledTimes(1);
+    });
+
     it('should throw an Error to trigger BullMQ retry when sanity validation rejects snapshot', async () => {
       ingestionService.fetchDailySnapshot!.mockResolvedValue({
         snapshot: mockSnapshot,
@@ -220,10 +264,10 @@ describe('IngestionProcessor & Scheduler Suite (Step 1.2 & 1.3)', () => {
   });
 
   describe('2. IngestionScheduler', () => {
-    it('should register morning domestic, London close, and monthly climate repeatable jobs on module init', async () => {
+    it('should register morning domestic, London close, monthly climate, and early 05:45 weather repeatable jobs on module init', async () => {
       await scheduler.onModuleInit();
 
-      expect(queueMock.upsertJobScheduler).toHaveBeenCalledTimes(3);
+      expect(queueMock.upsertJobScheduler).toHaveBeenCalledTimes(4);
 
       // 1. Morning Central Highlands cron
       expect(queueMock.upsertJobScheduler).toHaveBeenNthCalledWith(
@@ -264,6 +308,20 @@ describe('IngestionProcessor & Scheduler Suite (Step 1.2 & 1.3)', () => {
         expect.objectContaining({
           name: INGESTION_JOBS.MONTHLY_CLIMATE,
           data: { trigger: 'cron_monthly_climate_05_0300' },
+        }),
+      );
+
+      // 4. Early Daily Weather cron (05:45 before 06:00 Telegram briefing)
+      expect(queueMock.upsertJobScheduler).toHaveBeenNthCalledWith(
+        4,
+        'early_weather_0545',
+        {
+          pattern: INGESTION_CRONS.EARLY_WEATHER,
+          tz: INGESTION_CRONS.TIMEZONE,
+        },
+        expect.objectContaining({
+          name: INGESTION_JOBS.DAILY_WEATHER,
+          data: { trigger: 'cron_early_weather_0545' },
         }),
       );
     });

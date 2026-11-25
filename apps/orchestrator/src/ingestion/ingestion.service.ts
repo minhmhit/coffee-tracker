@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Prisma, RawMarketPrice, MacroClimateMonthly } from '@prisma/client';
+import { Prisma, RawMarketPrice, DailyWeather, IceRobustaStock } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { DomesticCoffeeAdapter } from './adapters/domestic-coffee.adapter';
 import { LondonRobustaAdapter } from './adapters/london-robusta.adapter';
@@ -7,8 +7,11 @@ import { ExchangeRateAdapter } from './adapters/exchange-rate.adapter';
 import { BrentOilAdapter } from './adapters/brent-oil.adapter';
 import { NoaaOniAdapter } from './adapters/noaa-oni.adapter';
 import { OpenMeteoAdapter, CLIMATE_LOCATIONS } from './adapters/open-meteo.adapter';
+import { WeatherAdapter } from './adapters/weather.adapter';
+import { IceStocksAdapter } from './adapters/ice-stocks.adapter';
 import { PriceSanityValidator, SanityCheckOptions, SanityCheckResult } from './validators/price-sanity.validator';
-import { DailyMarketSnapshot } from './types/market-data.types';
+import { IceStocksSanityValidator } from './validators/ice-stocks-sanity.validator';
+import { DailyMarketSnapshot, ProvinceWeatherData } from './types/market-data.types';
 
 @Injectable()
 export class IngestionService {
@@ -21,7 +24,10 @@ export class IngestionService {
     private readonly oilAdapter: BrentOilAdapter,
     private readonly noaaAdapter: NoaaOniAdapter,
     private readonly openMeteoAdapter: OpenMeteoAdapter,
+    private readonly weatherAdapter: WeatherAdapter,
+    private readonly iceStocksAdapter: IceStocksAdapter,
     private readonly validator: PriceSanityValidator,
+    private readonly iceStocksValidator: IceStocksSanityValidator,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -231,6 +237,242 @@ export class IngestionService {
       earliestDate: monthKeys[0],
       latestDate: monthKeys[monthKeys.length - 1],
       latestOni,
+    };
+  }
+
+  /**
+   * Synchronizes daily Central Highlands weather (4 provinces) from Open-Meteo Forecast API
+   * into `daily_weather`. Isolated from market price errors.
+   */
+  async syncDailyWeather(targetDate?: string): Promise<{
+    success: boolean;
+    syncedCount: number;
+    date?: string;
+    error?: string;
+  }> {
+    const res = await this.weatherAdapter.fetch();
+    if (!res.success || !res.data || res.data.length === 0) {
+      this.logger.warn(`Weather sync skipped/failed cleanly: ${res.error || 'empty data'}`);
+      return {
+        success: false,
+        syncedCount: 0,
+        error: res.error || 'Empty weather response',
+      };
+    }
+
+    let syncedCount = 0;
+    let savedDate = '';
+
+    for (const w of res.data) {
+      const dateStr = targetDate || w.weatherDate;
+      savedDate = dateStr;
+      const dateObj = new Date(`${dateStr}T00:00:00.000Z`);
+
+      await this.prisma.dailyWeather.upsert({
+        where: {
+          weather_date_province_code: {
+            weather_date: dateObj,
+            province_code: w.provinceCode,
+          },
+        },
+        update: {
+          province_name: w.provinceName,
+          temp_current: w.tempCurrent !== null ? new Prisma.Decimal(w.tempCurrent) : null,
+          temp_min: new Prisma.Decimal(w.tempMin),
+          temp_max: new Prisma.Decimal(w.tempMax),
+          precipitation_mm: new Prisma.Decimal(w.precipitationMm),
+          rain_probability: w.rainProbability,
+          humidity_pct: w.humidityPct,
+          wind_speed_kmh: w.windSpeedKmh !== null ? new Prisma.Decimal(w.windSpeedKmh) : null,
+          weather_code: w.weatherCode,
+          condition_vi: w.conditionVi,
+          farming_impact_vi: w.farmingImpactVi,
+          raw_meta: w.rawMeta as any,
+        },
+        create: {
+          weather_date: dateObj,
+          province_code: w.provinceCode,
+          province_name: w.provinceName,
+          temp_current: w.tempCurrent !== null ? new Prisma.Decimal(w.tempCurrent) : null,
+          temp_min: new Prisma.Decimal(w.tempMin),
+          temp_max: new Prisma.Decimal(w.tempMax),
+          precipitation_mm: new Prisma.Decimal(w.precipitationMm),
+          rain_probability: w.rainProbability,
+          humidity_pct: w.humidityPct,
+          wind_speed_kmh: w.windSpeedKmh !== null ? new Prisma.Decimal(w.windSpeedKmh) : null,
+          weather_code: w.weatherCode,
+          condition_vi: w.conditionVi,
+          farming_impact_vi: w.farmingImpactVi,
+          raw_meta: w.rawMeta as any,
+        },
+      });
+      syncedCount++;
+    }
+
+    this.logger.log(`Weather sync completed: upserted ${syncedCount} provinces for ${savedDate}`);
+    return {
+      success: true,
+      syncedCount,
+      date: savedDate,
+    };
+  }
+
+  /**
+   * Synchronizes ICE Futures Europe Certified Robusta Coffee Stocks into `ice_robusta_stocks`.
+   * Enforces sanity validation (500..50000 lots, ±25% DoD delta) and gracefully retains
+   * the latest known value with `is_stale = true` if upstream feeds fail.
+   */
+  async syncIceRobustaStocks(targetDate?: string): Promise<{
+    success: boolean;
+    reportDate?: string;
+    certifiedLots?: number;
+    certifiedTonnes?: number;
+    isStale: boolean;
+    error?: string;
+  }> {
+    const todayStr =
+      targetDate ||
+      new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Ho_Chi_Minh',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(new Date());
+
+    const res = await this.iceStocksAdapter.fetch();
+    let failureReason = res.error || '';
+
+    if (res.success && res.data) {
+      const stock = res.data;
+      const reportDateStr = targetDate || stock.reportDate;
+      const dateObj = new Date(`${reportDateStr}T00:00:00.000Z`);
+
+      const priorRecord = await this.prisma.iceRobustaStock.findFirst({
+        where: { report_date: { lt: dateObj } },
+        orderBy: { report_date: 'desc' },
+      });
+
+      const sanity = this.iceStocksValidator.validate(stock, {
+        previousLots: priorRecord?.certified_lots ?? null,
+      });
+
+      if (sanity.valid) {
+        const dodChangeLots = priorRecord ? stock.certifiedLots - priorRecord.certified_lots : null;
+        const saved = await this.prisma.iceRobustaStock.upsert({
+          where: { report_date: dateObj },
+          update: {
+            certified_lots: stock.certifiedLots,
+            certified_tonnes: new Prisma.Decimal(stock.certifiedTonnes),
+            dod_change_lots: dodChangeLots,
+            source_name: stock.sourceName,
+            is_stale: false,
+            raw_meta: {
+              ...(stock.rawMeta || {}),
+              is_stale: false,
+            } as any,
+          },
+          create: {
+            report_date: dateObj,
+            certified_lots: stock.certifiedLots,
+            certified_tonnes: new Prisma.Decimal(stock.certifiedTonnes),
+            dod_change_lots: dodChangeLots,
+            source_name: stock.sourceName,
+            is_stale: false,
+            raw_meta: {
+              ...(stock.rawMeta || {}),
+              is_stale: false,
+            } as any,
+          },
+        });
+
+        this.logger.log(
+          `ICE Robusta stocks synced: ${saved.certified_lots} lots (${saved.certified_tonnes} tonnes) for ${reportDateStr} from ${stock.sourceName}`,
+        );
+        return {
+          success: true,
+          reportDate: reportDateStr,
+          certifiedLots: saved.certified_lots,
+          certifiedTonnes: saved.certified_tonnes.toNumber(),
+          isStale: false,
+        };
+      }
+
+      failureReason = `Sanity validation failed: ${sanity.reasons.join('; ')}`;
+      this.logger.warn(`ICE Robusta stocks rejected by sanity validator: ${failureReason}`);
+    }
+
+    // Stale carry-forward fallback when upstream scrape failed or failed sanity
+    const latestValid = await this.prisma.iceRobustaStock.findFirst({
+      orderBy: { report_date: 'desc' },
+    });
+
+    if (!latestValid) {
+      this.logger.warn(`ICE Robusta stocks unavailable and no prior DB value exists: ${failureReason}`);
+      return {
+        success: false,
+        isStale: true,
+        error: failureReason || 'No ICE stock data available',
+      };
+    }
+
+    const todayObj = new Date(`${todayStr}T00:00:00.000Z`);
+    const existingToday = await this.prisma.iceRobustaStock.findUnique({
+      where: { report_date: todayObj },
+    });
+
+    if (existingToday && !existingToday.is_stale) {
+      return {
+        success: true,
+        reportDate: todayStr,
+        certifiedLots: existingToday.certified_lots,
+        certifiedTonnes: existingToday.certified_tonnes.toNumber(),
+        isStale: false,
+      };
+    }
+
+    const carriedFromDate = latestValid.report_date.toISOString().split('T')[0];
+    const staleSaved = await this.prisma.iceRobustaStock.upsert({
+      where: { report_date: todayObj },
+      update: {
+        certified_lots: latestValid.certified_lots,
+        certified_tonnes: latestValid.certified_tonnes,
+        dod_change_lots: 0,
+        source_name: 'stale_carry_forward',
+        is_stale: true,
+        raw_meta: {
+          is_stale: true,
+          carried_from_date: carriedFromDate,
+          original_source: latestValid.source_name,
+          reason: failureReason,
+        } as any,
+      },
+      create: {
+        report_date: todayObj,
+        certified_lots: latestValid.certified_lots,
+        certified_tonnes: latestValid.certified_tonnes,
+        dod_change_lots: 0,
+        source_name: 'stale_carry_forward',
+        is_stale: true,
+        raw_meta: {
+          is_stale: true,
+          carried_from_date: carriedFromDate,
+          original_source: latestValid.source_name,
+          reason: failureReason,
+        } as any,
+      },
+    });
+
+    this.logger.warn(
+      `Retained stale ICE Robusta stocks (${staleSaved.certified_lots} lots from ${carriedFromDate}) for ${todayStr}`,
+    );
+
+    return {
+      success: true,
+      reportDate: todayStr,
+      certifiedLots: staleSaved.certified_lots,
+      certifiedTonnes: staleSaved.certified_tonnes.toNumber(),
+      isStale: true,
+      error: failureReason,
     };
   }
 }

@@ -4,7 +4,8 @@ import { Queue } from 'bullmq';
 import { ALERT_JOBS, ALERT_QUEUE_NAME } from '../../signals/signals.constants';
 
 export const ALERT_CRONS = {
-  MORNING_BRIEFING: '45 8 * * *', // 08:45 AM Asia/Ho_Chi_Minh daily
+  MORNING_BRIEFING: process.env.TELEGRAM_BRIEFING_CRON || '0 6 * * *', // 06:00 AM Asia/Ho_Chi_Minh daily (mỗi 6h sáng)
+  MORNING_BRIEFING_0600: '0 6 * * *', // 06:00 AM Asia/Ho_Chi_Minh daily
   TIMEZONE: 'Asia/Ho_Chi_Minh',
 };
 
@@ -22,21 +23,22 @@ export class AlertScheduler implements OnModuleInit {
   }
 
   /**
-   * Registers BullMQ repeatable cron job for daily 08:45 AM Morning Briefing.
+   * Registers BullMQ repeatable cron job for daily 06:00 AM Morning Briefing.
    */
   async registerRepeatableJobs() {
     try {
       this.logger.log('Registering BullMQ scheduled repeatable alert jobs...');
 
+      // 1. Daily 06:00 AM Morning Market Briefing (Mỗi 6h sáng)
       await this.alertQueue.upsertJobScheduler(
-        'morning_briefing_0845',
+        'morning_briefing_0600',
         {
-          pattern: ALERT_CRONS.MORNING_BRIEFING,
+          pattern: ALERT_CRONS.MORNING_BRIEFING_0600,
           tz: ALERT_CRONS.TIMEZONE,
         },
         {
           name: ALERT_JOBS.MORNING_BRIEFING,
-          data: { trigger: 'cron_morning_briefing_0845' },
+          data: { trigger: 'cron_morning_briefing_0600', slot: '0600' },
           opts: {
             attempts: 3,
             backoff: { type: 'exponential', delay: 5000 },
@@ -47,7 +49,7 @@ export class AlertScheduler implements OnModuleInit {
       );
 
       this.logger.log(
-        `Scheduled [${ALERT_JOBS.MORNING_BRIEFING}] at ${ALERT_CRONS.MORNING_BRIEFING} (${ALERT_CRONS.TIMEZONE})`,
+        `Scheduled [${ALERT_JOBS.MORNING_BRIEFING}] at ${ALERT_CRONS.MORNING_BRIEFING_0600} (${ALERT_CRONS.TIMEZONE}) [Slot: 06:00 AM]`,
       );
     } catch (error: any) {
       this.logger.error(`Failed to register alert repeatable jobs: ${error.message}`, error.stack);

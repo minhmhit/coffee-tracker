@@ -44,6 +44,26 @@ export class IngestionProcessor extends WorkerHost {
       };
     }
 
+    // 1b. Standalone Daily Weather Sync (e.g. early 05:45 AM before 06:00 Telegram briefing)
+    if (job.name === INGESTION_JOBS.DAILY_WEATHER) {
+      this.logger.log('Executing daily Central Highlands weather synchronization job...');
+      const weatherResult = await this.ingestionService.syncDailyWeather(job.data?.targetDate);
+      return {
+        type: 'daily_weather',
+        ...weatherResult,
+      };
+    }
+
+    // 1c. Standalone ICE Certified Robusta Stocks Sync
+    if (job.name === INGESTION_JOBS.DAILY_ICE_STOCKS) {
+      this.logger.log('Executing ICE Certified Robusta Stocks synchronization job...');
+      const stockResult = await this.ingestionService.syncIceRobustaStocks(job.data?.targetDate);
+      return {
+        type: 'daily_ice_stocks',
+        ...stockResult,
+      };
+    }
+
     // 2. Daily Market Price Ingestion (Domestic + London + FX + Oil)
     const { snapshot, sanityResult, errors } = await this.ingestionService.fetchDailySnapshot(
       job.data?.targetDate,
@@ -59,7 +79,18 @@ export class IngestionProcessor extends WorkerHost {
 
     const record = await this.ingestionService.upsertDailySnapshot(snapshot);
 
-    // 3. Automatically chain pipeline: trigger daily signals calculation
+    // 3. Fault-isolated secondary sync: Daily Weather + ICE Certified Robusta Stocks
+    // Never abort or fail daily market price ingestion if these secondary feeds fail.
+    await Promise.allSettled([
+      this.ingestionService.syncDailyWeather?.(snapshot.date).catch((wErr: any) => {
+        this.logger.warn(`Isolated weather sync failure: ${wErr.message}`);
+      }),
+      this.ingestionService.syncIceRobustaStocks?.(snapshot.date).catch((sErr: any) => {
+        this.logger.warn(`Isolated ICE stocks sync failure: ${sErr.message}`);
+      }),
+    ]);
+
+    // 4. Automatically chain pipeline: trigger daily signals calculation
     try {
       this.logger.log(`Enqueuing signals computation job for date: ${snapshot.date}...`);
       await this.signalsQueue.add(

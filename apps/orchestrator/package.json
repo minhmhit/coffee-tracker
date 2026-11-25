@@ -10,11 +10,13 @@
     "start:prod": "node dist/main",
     "test": "jest",
     "forecast:trigger": "ts-node src/forecast/scripts/trigger-forecast.ts",
+    "alert:briefing": "ts-node src/alerts/scripts/trigger-briefing.ts",
     "test:telegram": "ts-node src/alerts/scripts/test-telegram.ts",
     "dry-run": "ts-node src/ingestion/scripts/dry-run.ts",
     "backfill": "ts-node src/ingestion/scripts/backfill-history.ts",
     "backfill:climate": "ts-node src/ingestion/scripts/backfill-climate.ts",
-    "backfill:signals": "ts-node src/signals/scripts/backfill-signals.ts"
+    "backfill:signals": "ts-node src/signals/scripts/backfill-signals.ts",
+    "sync:weather-stocks": "ts-node src/ingestion/scripts/sync-weather-stocks.ts"
   },
   "dependencies": {
     "@nestjs/bullmq": "^11.0.5",

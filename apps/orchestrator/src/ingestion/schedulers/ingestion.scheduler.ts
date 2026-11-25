@@ -98,6 +98,28 @@ export class IngestionScheduler implements OnModuleInit {
         `Scheduled [${INGESTION_JOBS.MONTHLY_CLIMATE}] at ${INGESTION_CRONS.MONTHLY_CLIMATE} (${INGESTION_CRONS.TIMEZONE})`,
       );
 
+      // 4. Early Daily Weather Ingestion (05:45 Asia/Ho_Chi_Minh, ready before 06:00 Telegram briefing)
+      await this.ingestionQueue.upsertJobScheduler(
+        'early_weather_0545',
+        {
+          pattern: INGESTION_CRONS.EARLY_WEATHER,
+          tz: INGESTION_CRONS.TIMEZONE,
+        },
+        {
+          name: INGESTION_JOBS.DAILY_WEATHER,
+          data: { trigger: 'cron_early_weather_0545' },
+          opts: {
+            attempts: 3,
+            backoff: { type: 'exponential', delay: 5000 },
+            removeOnComplete: INGESTION_JOB_OPTIONS.removeOnComplete,
+            removeOnFail: INGESTION_JOB_OPTIONS.removeOnFail,
+          },
+        },
+      );
+      this.logger.log(
+        `Scheduled [${INGESTION_JOBS.DAILY_WEATHER}] at ${INGESTION_CRONS.EARLY_WEATHER} (${INGESTION_CRONS.TIMEZONE})`,
+      );
+
       const count = await this.ingestionQueue.getJobSchedulersCount();
       this.logger.log(`Active job schedulers in '${INGESTION_QUEUE_NAME}': ${count}`);
     } catch (error: any) {

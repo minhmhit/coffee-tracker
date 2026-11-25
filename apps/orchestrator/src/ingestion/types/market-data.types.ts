@@ -40,3 +40,32 @@ export interface AdapterResult<T> {
   source: string;
   latencyMs: number;
 }
+
+export type ProvinceWeatherCode = 'DAKLAK' | 'LAMDONG' | 'GIALAI' | 'DAKNONG';
+
+export interface ProvinceWeatherData {
+  weatherDate: string; // YYYY-MM-DD
+  provinceCode: ProvinceWeatherCode;
+  provinceName: string;
+  tempCurrent: number | null;
+  tempMin: number;
+  tempMax: number;
+  precipitationMm: number;
+  rainProbability: number | null;
+  humidityPct: number | null;
+  windSpeedKmh: number | null;
+  weatherCode: number;
+  conditionVi: string;
+  farmingImpactVi: string;
+  rawMeta?: Record<string, any>;
+}
+
+export interface IceRobustaStockData {
+  reportDate: string; // YYYY-MM-DD
+  certifiedLots: number;
+  certifiedTonnes: number;
+  dodChangeLots?: number | null;
+  sourceName: string;
+  isStale: boolean;
+  rawMeta?: Record<string, any>;
+}
