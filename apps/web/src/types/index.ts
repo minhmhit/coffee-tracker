@@ -117,3 +117,107 @@ export interface ClimateLatest {
   rainfall_anomaly_daklak: number | null;
   rainfall_anomaly_linhares: number | null;
 }
+
+export interface DailyWeatherItem {
+  weather_date: string;
+  province_code: string;
+  province_name: string;
+  temp_current: number | null;
+  temp_min: number | null;
+  temp_max: number | null;
+  precipitation_mm: number | null;
+  rain_probability: number | null;
+  humidity_pct: number | null;
+  wind_speed_kmh: number | null;
+  weather_code: number;
+  condition_vi: string;
+  farming_impact_vi: string;
+  updated_at?: string;
+}
+
+export interface WeatherTodayResponse {
+  date: string | null;
+  benchmark: DailyWeatherItem | null;
+  provinces: DailyWeatherItem[];
+}
+
+export interface RobustaStockLatest {
+  report_date: string;
+  certified_lots: number;
+  certified_tonnes: number;
+  dod_change_lots: number | null;
+  source_name: string;
+  is_stale?: boolean;
+  raw_meta?: Record<string, any> | null;
+  updated_at?: string;
+  change_7d_lots: number | null;
+  change_30d_lots: number | null;
+}
+
+export type InsightTrend = 'UP' | 'DOWN' | 'NEUTRAL';
+export type OverallStance = 'TÍCH CỰC' | 'TRUNG LẬP' | 'THẬN TRỌNG';
+
+export interface InsightFactorCard {
+  key: 'oil' | 'inventory_supply' | 'fx' | 'weather_climate' | string;
+  title: string;
+  trend: InsightTrend;
+  badge_label: string;
+  metric_value: string;
+  metric_source: string;
+  explanation: string;
+  impact_on_coffee: string;
+  details?: Record<string, any> | null;
+}
+
+export interface ForecastMilestoneSummary {
+  horizon_label: string;
+  horizon_week: number;
+  target_date: string;
+  pred_p10: number;
+  pred_p50: number;
+  pred_p90: number;
+  baseline_rw: number | null;
+  baseline_futures: number | null;
+  delta_vs_today_pct: number | null;
+  band_width_pct: number | null;
+}
+
+export interface ForecastTransparencySummary {
+  available: boolean;
+  run_id: string | null;
+  forecast_date: string | null;
+  origin_price_daklak: number | null;
+  model_version: string | null;
+  direction_label: string;
+  summary: string;
+  confidence_note: string;
+  key_drivers: string[];
+  milestones: ForecastMilestoneSummary[];
+  metrics: ForecastMetrics | null;
+}
+
+export interface MarketInsightsResponse {
+  generated_at: string;
+  as_of_date: string | null;
+  overall_stance: OverallStance;
+  executive_summary: string;
+  factors: InsightFactorCard[];
+  forecast_transparency: ForecastTransparencySummary;
+}
+
+export interface TelegramCommandInfo {
+  command: string;
+  description: string;
+}
+
+export interface TelegramOnboardingInfo {
+  botUsername: string;
+  deepLink: string;
+  briefingSchedule: string;
+  cronExpression: string;
+  activeSubscribersCount: number;
+  telegramConfigured: boolean;
+  commands: TelegramCommandInfo[];
+  sampleMessagePreview: string;
+  sampleMessageHtml?: string;
+}

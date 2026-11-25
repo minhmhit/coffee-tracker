@@ -6,6 +6,10 @@ import {
   ForecastLatest,
   ForecastRunsResponse,
   ClimateLatest,
+  WeatherTodayResponse,
+  RobustaStockLatest,
+  MarketInsightsResponse,
+  TelegramOnboardingInfo,
 } from '../types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -60,6 +64,22 @@ export async function fetchForecastRuns(limit = 20, offset = 0): Promise<Forecas
 
 export async function fetchClimateLatest(): Promise<ClimateLatest | null> {
   return safeFetch<ClimateLatest | null>('/api/climate/latest', null);
+}
+
+export async function fetchWeatherToday(): Promise<WeatherTodayResponse | null> {
+  return safeFetch<WeatherTodayResponse | null>('/api/weather/today', null);
+}
+
+export async function fetchRobustaStockLatest(): Promise<RobustaStockLatest | null> {
+  return safeFetch<RobustaStockLatest | null>('/api/stocks/robusta/latest', null);
+}
+
+export async function fetchInsightsLatest(): Promise<MarketInsightsResponse | null> {
+  return safeFetch<MarketInsightsResponse | null>('/api/insights/latest', null);
+}
+
+export async function fetchTelegramInfo(): Promise<TelegramOnboardingInfo | null> {
+  return safeFetch<TelegramOnboardingInfo | null>('/api/alerts/telegram-info', null);
 }
 
 export async function triggerForecastJob(): Promise<{ success: boolean; message: string; jobId?: string }> {

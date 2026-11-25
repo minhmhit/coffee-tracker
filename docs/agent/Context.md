@@ -23,9 +23,9 @@
 
 ## 2. Current Progress Tracker `[AUTO-UPDATE]`
 
-- **Active Phase:** Phase 5 — Live Weather, Explainable Insights, Telegram Onboarding & UX Redesign
-- **Last Completed Step:** `STEP 5.3` (Telegram Bot Self-Service Onboarding & Enriched Morning Briefing)
-- **Next Step to Execute:** `STEP 5.4` (Frontend UX Redesign & Full E2E Smoke Test)
+- **Active Phase:** Phase 5 — Live Weather, Explainable Insights, Telegram Onboarding & UX Redesign (`COMPLETED`)
+- **Last Completed Step:** `STEP 5.4` (Frontend Light Editorial UX Redesign & E2E Stack Smoke Test)
+- **Next Step to Execute:** Phase 6 — UI Refinement (theo yêu cầu tinh chỉnh giao diện của User)
 - **Overall Status:**
   - [x] Phase 0: Step 0.1 (Monorepo & Docker - DONE)
   - [x] Phase 0: Step 0.2 (DB Schema & Prisma - DONE)
@@ -44,7 +44,7 @@
   - [x] Phase 5: Step 5.1 (Live Weather, ICE Robusta Stocks & Schema Extension - DONE)
   - [x] Phase 5: Step 5.2 (Explainable Insights - DONE)
   - [x] Phase 5: Step 5.3 (Telegram Self-Service & Enriched Briefing - DONE)
-  - [ ] Phase 5: Step 5.4 (UX Redesign & E2E Smoke Test)
+  - [x] Phase 5: Step 5.4 (UX Redesign & E2E Smoke Test - DONE)
 
 ---
 
@@ -82,6 +82,7 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
 - **Market Insights Engine:** 100% deterministic quantitative rules + Vietnamese templates citing exact DB figures (<35ms latency); initial ICE stocks history (<7 days) uses latest lot count + Spread/Regime until 7d/30d history accumulates (Confirmed in Step 5.2)
 - **Telegram Self-Service Bot:** Option A — Long-Polling (`getUpdates`) inside NestJS HTTP server with `OnModuleDestroy` + `dns.setDefaultResultOrder('ipv4first')`; bot username `@minhmh_coffee_tracker_bot` via `getMe` + `TELEGRAM_BOT_USERNAME` (Confirmed in Step 5.3)
 - **Coffee Inventory Data Strategy:** Ingest real ICE Certified Robusta Stocks (`ice_robusta_stocks`, 1 lot = 10 tonnes) from external source (Primary: ICE Report Center `https://www.ice.com/report/173`; Fallback: `vietnambiz.vn` daily market report / stale-flag retention), combined with Calendar Spread (M1-M6) & Regime in `InsightsModule` (Confirmed for Phase 5)
+- **UX Redesign Theme & Layout:** Option B — Light Editorial (`stone-50`/`white` + `amber-*` coffee accent), essential-info-first across 5 tiers; Telegram onboarding placed in both Header CTA modal and Tier 4 section (`@minhmh_coffee_tracker_bot` + scannable QR SVG) (Confirmed in Step 5.4)
 ---
 
 ## 4. Active Architecture State `[AUTO-UPDATE]`
@@ -95,7 +96,7 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
   - `raw_market_prices`: **3,248 continuous records** (2018-01-01 to 2026-11-22).
   - `macro_climate_monthly`: **107 continuous monthly records** (2018-01-01 to 2026-11-01).
   - `daily_signals`: **3,248 continuous records** (2018-01-01 to 2026-11-22). Columns: `signal_date`, `basis`, `spread`, `volatility_30d`, `z_score`, `is_anomaly`, `regime`, `notes`, timestamps.
-  - `forecast_runs`: **1 record** (`b10e0d43-d324-4253-b76a-472333f4af25`, status: `SUCCESS`).
+  - `forecast_runs`: **3 records** (`SUCCESS` forecasts stored in PostgreSQL).
   - `forecast_predictions`: **26 records** ($h = 1..26$, $P_{10}, P_{50}, P_{90}$, Naive RW, Futures baseline).
   - `daily_weather`: **4 records** for `2026-11-25` (`DAKLAK`, `LAMDONG`, `GIALAI`, `DAKNONG`).
   - `ice_robusta_stocks`: **1 record** (`2026-11-24`, `5,791` lots / `57,910` tonnes via `vietnambiz.vn` fallback).
@@ -139,7 +140,7 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
   - `GET /api/stocks/robusta/history` (Historical ICE Certified Robusta stocks ?days=90)
   - `GET /api/insights/latest` (Explainable insights for Oil, ICE Stocks/Supply, FX, Weather/Climate + Forecast transparency)
 - **NextJS Frontend Active:**
-  - `http://localhost:3000` (Next.js 15 App Router Dashboard, Pure SVG Probabilistic Fan Chart, KPI Cards, Signals Table, Audit Trail)
+  - `http://localhost:3000` (Next.js 15 App Router — Light Editorial 5-Tier Dashboard: Price Hero, Weather Today, Market Insights & Forecast Transparency Fan Chart, Telegram QR Onboarding + Modal, Price History, Signals & Audit Trail with fixed MAPE `%`)
 - **NestJS Modules Active:** `HealthModule`, `PrismaModule` (Global), `IngestionModule`, `SignalsModule`, `AlertsModule`, `ForecastModule`, `InsightsModule`
 
 ---
@@ -177,3 +178,4 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
 | `STEP 5.1` | 2026-11-25 | 3 new Prisma tables, WeatherAdapter (4 provinces), IceStocksAdapter + sanity validator, 9/9 Jest suites (83 tests) PASS | [step_5_1_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_5_1_report.md) |
 | `STEP 5.2` | 2026-11-25 | InsightsModule (Oil, ICE Stocks/Supply, FX, Weather/Climate, Forecast Transparency), 10/10 Jest suites (89 tests) PASS, <35ms live | [step_5_2_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_5_2_report.md) |
 | `STEP 5.3` | 2026-11-25 | Telegram Long-Polling bot (@minhmh_coffee_tracker_bot), /start /today /stop, enriched 4-section briefing (Msg 14), 11/11 Jest suites PASS | [step_5_3_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_5_3_report.md) |
+| `STEP 5.4` | 2026-11-25 | Light Editorial 5-tier UX redesign, QR Telegram onboarding, MAPE % fix, `next build` & backend API/DB E2E PASS | [step_5_4_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_5_4_report.md) |
