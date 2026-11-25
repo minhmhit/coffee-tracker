@@ -11,7 +11,7 @@ import { IngestionService } from './ingestion.service';
 import { IngestionProcessor } from './processors/ingestion.processor';
 import { IngestionScheduler } from './schedulers/ingestion.scheduler';
 import { INGESTION_QUEUE_NAME } from './ingestion.constants';
-import { SIGNALS_QUEUE_NAME } from '../signals/signals.constants';
+import { ALERT_QUEUE_NAME, SIGNALS_QUEUE_NAME } from '../signals/signals.constants';
 
 @Module({
   imports: [
@@ -21,6 +21,9 @@ import { SIGNALS_QUEUE_NAME } from '../signals/signals.constants';
       },
       {
         name: SIGNALS_QUEUE_NAME,
+      },
+      {
+        name: ALERT_QUEUE_NAME,
       },
     ),
   ],

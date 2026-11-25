@@ -2,7 +2,7 @@ import { Processor, WorkerHost, OnWorkerEvent, InjectQueue } from '@nestjs/bullm
 import { Job, Queue } from 'bullmq';
 import { Logger } from '@nestjs/common';
 import { INGESTION_JOBS, INGESTION_QUEUE_NAME } from '../ingestion.constants';
-import { SIGNALS_JOBS, SIGNALS_QUEUE_NAME } from '../../signals/signals.constants';
+import { ALERT_JOBS, ALERT_QUEUE_NAME, SIGNALS_JOBS, SIGNALS_QUEUE_NAME } from '../../signals/signals.constants';
 import { IngestionService } from '../ingestion.service';
 
 export interface IngestionJobPayload {
@@ -18,6 +18,8 @@ export class IngestionProcessor extends WorkerHost {
     private readonly ingestionService: IngestionService,
     @InjectQueue(SIGNALS_QUEUE_NAME)
     private readonly signalsQueue: Queue,
+    @InjectQueue(ALERT_QUEUE_NAME)
+    private readonly alertQueue: Queue,
   ) {
     super();
   }
@@ -87,15 +89,36 @@ export class IngestionProcessor extends WorkerHost {
   }
 
   @OnWorkerEvent('failed')
-  onJobFailed(job: Job<IngestionJobPayload>, error: Error) {
+  async onJobFailed(job: Job<IngestionJobPayload>, error: Error) {
     this.logger.warn(
       `Job ${job.id} [${job.name}] failed attempt ${job.attemptsMade}/${job.opts.attempts || 5}: ${error.message}`,
     );
 
     if (job.attemptsMade >= (job.opts.attempts || 5)) {
       this.logger.error(
-        `[CRITICAL ALERT] Ingestion job ${job.id} [${job.name}] permanently failed after ${job.attemptsMade} attempts! Reason: ${error.message}. Ready for Telegram alert dispatch.`,
+        `[CRITICAL ALERT] Ingestion job ${job.id} [${job.name}] permanently failed after ${job.attemptsMade} attempts! Reason: ${error.message}. Dispatching System Error Alert...`,
       );
+
+      try {
+        await this.alertQueue.add(
+          ALERT_JOBS.SYSTEM_ERROR,
+          {
+            queueName: INGESTION_QUEUE_NAME,
+            jobId: String(job.id),
+            jobName: job.name,
+            attempts: job.attemptsMade,
+            maxAttempts: job.opts.attempts || 5,
+            errorMessage: error.message,
+          },
+          {
+            priority: 1,
+            removeOnComplete: 100,
+            removeOnFail: 500,
+          },
+        );
+      } catch (alertErr: any) {
+        this.logger.error(`Failed to enqueue SYSTEM_ERROR alert: ${alertErr.message}`);
+      }
     }
   }
 

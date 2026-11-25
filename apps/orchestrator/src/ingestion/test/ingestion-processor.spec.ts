@@ -5,7 +5,7 @@ import { IngestionProcessor } from '../processors/ingestion.processor';
 import { IngestionScheduler } from '../schedulers/ingestion.scheduler';
 import { IngestionService } from '../ingestion.service';
 import { INGESTION_CRONS, INGESTION_JOBS, INGESTION_QUEUE_NAME } from '../ingestion.constants';
-import { SIGNALS_JOBS, SIGNALS_QUEUE_NAME } from '../../signals/signals.constants';
+import { ALERT_JOBS, ALERT_QUEUE_NAME, SIGNALS_JOBS, SIGNALS_QUEUE_NAME } from '../../signals/signals.constants';
 import { Prisma } from '@prisma/client';
 
 describe('IngestionProcessor & Scheduler Suite (Step 1.2 & 1.3)', () => {
@@ -14,6 +14,7 @@ describe('IngestionProcessor & Scheduler Suite (Step 1.2 & 1.3)', () => {
   let ingestionService: jest.Mocked<Partial<IngestionService>>;
   let queueMock: jest.Mocked<Partial<Queue>>;
   let signalsQueueMock: jest.Mocked<Partial<Queue>>;
+  let alertQueueMock: jest.Mocked<Partial<Queue>>;
 
   const mockSnapshot = {
     date: '2026-11-22',
@@ -77,6 +78,10 @@ describe('IngestionProcessor & Scheduler Suite (Step 1.2 & 1.3)', () => {
       add: jest.fn().mockResolvedValue({ id: 'sig-job-1' } as any),
     };
 
+    alertQueueMock = {
+      add: jest.fn().mockResolvedValue({ id: 'alert-job-1' } as any),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         IngestionProcessor,
@@ -92,6 +97,10 @@ describe('IngestionProcessor & Scheduler Suite (Step 1.2 & 1.3)', () => {
         {
           provide: getQueueToken(SIGNALS_QUEUE_NAME),
           useValue: signalsQueueMock,
+        },
+        {
+          provide: getQueueToken(ALERT_QUEUE_NAME),
+          useValue: alertQueueMock,
         },
       ],
     }).compile();
@@ -185,7 +194,7 @@ describe('IngestionProcessor & Scheduler Suite (Step 1.2 & 1.3)', () => {
       expect(signalsQueueMock.add).not.toHaveBeenCalled();
     });
 
-    it('should log warning and handle onJobFailed without crashing', () => {
+    it('should log warning and dispatch SYSTEM_ERROR alert when all retries are exhausted', async () => {
       const job = {
         id: 'job-retry',
         name: INGESTION_JOBS.DAILY_MARKET_DATA,
@@ -193,9 +202,20 @@ describe('IngestionProcessor & Scheduler Suite (Step 1.2 & 1.3)', () => {
         opts: { attempts: 5 },
       } as unknown as Job;
 
-      expect(() => {
-        processor.onJobFailed(job as any, new Error('Network timeout'));
-      }).not.toThrow();
+      await processor.onJobFailed(job as any, new Error('Network timeout'));
+
+      expect(alertQueueMock.add).toHaveBeenCalledWith(
+        ALERT_JOBS.SYSTEM_ERROR,
+        expect.objectContaining({
+          queueName: INGESTION_QUEUE_NAME,
+          jobId: 'job-retry',
+          jobName: INGESTION_JOBS.DAILY_MARKET_DATA,
+          attempts: 5,
+          maxAttempts: 5,
+          errorMessage: 'Network timeout',
+        }),
+        expect.any(Object),
+      );
     });
   });
 

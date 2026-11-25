@@ -9,6 +9,7 @@
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main",
     "test": "jest",
+    "test:telegram": "ts-node src/alerts/scripts/test-telegram.ts",
     "dry-run": "ts-node src/ingestion/scripts/dry-run.ts",
     "backfill": "ts-node src/ingestion/scripts/backfill-history.ts",
     "backfill:climate": "ts-node src/ingestion/scripts/backfill-climate.ts",
