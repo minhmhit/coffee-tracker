@@ -24,8 +24,8 @@
 ## 2. Current Progress Tracker `[AUTO-UPDATE]`
 
 - **Active Phase:** Phase 5 — Live Weather, Explainable Insights, Telegram Onboarding & UX Redesign
-- **Last Completed Step:** `STEP 5.2` (Explainable Market Insights Engine)
-- **Next Step to Execute:** `STEP 5.3` (Telegram Bot Self-Service Onboarding & Enriched Morning Briefing)
+- **Last Completed Step:** `STEP 5.3` (Telegram Bot Self-Service Onboarding & Enriched Morning Briefing)
+- **Next Step to Execute:** `STEP 5.4` (Frontend UX Redesign & Full E2E Smoke Test)
 - **Overall Status:**
   - [x] Phase 0: Step 0.1 (Monorepo & Docker - DONE)
   - [x] Phase 0: Step 0.2 (DB Schema & Prisma - DONE)
@@ -43,7 +43,8 @@
   - [x] Phase 4: Step 4.3 (Next.js Dashboard & E2E Smoke Test - DONE)
   - [x] Phase 5: Step 5.1 (Live Weather, ICE Robusta Stocks & Schema Extension - DONE)
   - [x] Phase 5: Step 5.2 (Explainable Insights - DONE)
-  - [ ] Phase 5: Step 5.3 (Telegram Self-Service & Enriched Briefing) | Step 5.4 (UX Redesign & E2E Smoke Test)
+  - [x] Phase 5: Step 5.3 (Telegram Self-Service & Enriched Briefing - DONE)
+  - [ ] Phase 5: Step 5.4 (UX Redesign & E2E Smoke Test)
 
 ---
 
@@ -79,6 +80,7 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
 - **Daily Weather Scope & Provider:** Option A — all 4 Central Highlands provinces (`DAKLAK`, `LAMDONG`, `GIALAI`, `DAKNONG`) via Open-Meteo Forecast API (`https://api.open-meteo.com/v1/forecast`), updated at `05:45` (`45 5 * * *` VN) + paired with `08:30` & `01:00` ingestion (Confirmed in Step 5.1)
 - **ICE Certified Robusta Stocks Source & Sanity:** Primary `https://www.ice.com/report/173` (returns SPA/click-through gate) -> Fallback `vietnambiz.vn` coffee market articles (`5.791 lô` verified live) -> Stale carry-forward with `is_stale = true`; bounds `[500, 50000]` lots, `1 lot = 10 tonnes`, `<= ±25%` DoD delta (Confirmed in Step 5.1)
 - **Market Insights Engine:** 100% deterministic quantitative rules + Vietnamese templates citing exact DB figures (<35ms latency); initial ICE stocks history (<7 days) uses latest lot count + Spread/Regime until 7d/30d history accumulates (Confirmed in Step 5.2)
+- **Telegram Self-Service Bot:** Option A — Long-Polling (`getUpdates`) inside NestJS HTTP server with `OnModuleDestroy` + `dns.setDefaultResultOrder('ipv4first')`; bot username `@minhmh_coffee_tracker_bot` via `getMe` + `TELEGRAM_BOT_USERNAME` (Confirmed in Step 5.3)
 - **Coffee Inventory Data Strategy:** Ingest real ICE Certified Robusta Stocks (`ice_robusta_stocks`, 1 lot = 10 tonnes) from external source (Primary: ICE Report Center `https://www.ice.com/report/173`; Fallback: `vietnambiz.vn` daily market report / stale-flag retention), combined with Calendar Spread (M1-M6) & Regime in `InsightsModule` (Confirmed for Phase 5)
 ---
 
@@ -128,6 +130,7 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
   - `POST /api/forecast/trigger` (Manual forecast trigger)
   - `POST /api/alerts/briefing/trigger` (Manual 06:00 AM briefing trigger to Telegram)
   - `GET /api/alerts/status` (Telegram alerting config and 06:00 AM cron schedule status)
+  - `GET /api/alerts/telegram-info` (Telegram onboarding botUsername, deepLink, commands & live briefing preview)
   - `GET /api/climate/latest` (Latest monthly climate anomaly)
   - `GET /api/climate/history` (Monthly climate history)
   - `GET /api/weather/today` (Live 4-province Central Highlands weather + Đắk Lắk benchmark)
@@ -173,3 +176,4 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
 | `STEP 4.3` | 2026-11-25 | Next.js 15 Dashboard UI + Pure SVG Fan Chart + E2E Smoke Test across all services PASS | [step_4_3_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_4_3_report.md) |
 | `STEP 5.1` | 2026-11-25 | 3 new Prisma tables, WeatherAdapter (4 provinces), IceStocksAdapter + sanity validator, 9/9 Jest suites (83 tests) PASS | [step_5_1_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_5_1_report.md) |
 | `STEP 5.2` | 2026-11-25 | InsightsModule (Oil, ICE Stocks/Supply, FX, Weather/Climate, Forecast Transparency), 10/10 Jest suites (89 tests) PASS, <35ms live | [step_5_2_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_5_2_report.md) |
+| `STEP 5.3` | 2026-11-25 | Telegram Long-Polling bot (@minhmh_coffee_tracker_bot), /start /today /stop, enriched 4-section briefing (Msg 14), 11/11 Jest suites PASS | [step_5_3_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_5_3_report.md) |

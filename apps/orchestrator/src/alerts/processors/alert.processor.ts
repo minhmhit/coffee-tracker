@@ -1,10 +1,11 @@
 import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
-import { Logger } from '@nestjs/common';
+import { Logger, Optional } from '@nestjs/common';
 import { ALERT_JOBS, ALERT_QUEUE_NAME } from '../../signals/signals.constants';
-import { TelegramService } from '../telegram.service';
+import { TelegramService, TelegramSendResult } from '../telegram.service';
 import { AlertFormatter, AnomalyAlertData, SystemErrorData } from '../alert-formatter';
 import { PrismaService } from '../../prisma/prisma.service';
+import { MorningBriefingService } from '../morning-briefing.service';
 
 @Processor(ALERT_QUEUE_NAME)
 export class AlertProcessor extends WorkerHost {
@@ -17,6 +18,7 @@ export class AlertProcessor extends WorkerHost {
   constructor(
     private readonly telegramService: TelegramService,
     private readonly prisma: PrismaService,
+    @Optional() private readonly briefingService?: MorningBriefingService,
   ) {
     super();
   }
@@ -41,85 +43,155 @@ export class AlertProcessor extends WorkerHost {
   }
 
   /**
-   * Handles daily 08:45 Morning Market Briefing.
+   * Handles daily 06:00 AM Morning Market Briefing broadcast across all active subscribers
+   * and fallback .env chat_id.
    */
   private async handleMorningBriefing(job: Job<any>): Promise<any> {
-    // 1. Fetch 2 most recent price records to compute Day-over-Day change
-    const recentPrices = await this.prisma.rawMarketPrice.findMany({
-      orderBy: { price_date: 'desc' },
-      take: 2,
-    });
+    const slot = job.data?.slot || '0600';
 
-    if (recentPrices.length === 0) {
-      this.logger.warn('No market price data available for morning briefing');
-      return { skipped: true, reason: 'No market prices found' };
+    // Build enriched HTML via shared MorningBriefingService when injected, or direct fallback
+    let dateStr: string;
+    let messageHtml: string;
+
+    if (this.briefingService) {
+      const built = await this.briefingService.buildEnrichedBriefing();
+      if (!built) {
+        this.logger.warn('No market price data available for morning briefing');
+        return { skipped: true, reason: 'No market prices found' };
+      }
+      dateStr = built.dateStr;
+      messageHtml = built.html;
+    } else {
+      const legacyBuilt = await this.buildLegacyFallbackBriefing();
+      if (!legacyBuilt) {
+        this.logger.warn('No market price data available for morning briefing');
+        return { skipped: true, reason: 'No market prices found' };
+      }
+      dateStr = legacyBuilt.dateStr;
+      messageHtml = legacyBuilt.html;
     }
 
-    const latest = recentPrices[0];
-    const prev = recentPrices.length > 1 ? recentPrices[1] : null;
-
-    const dateStr = latest.price_date.toISOString().split('T')[0];
-    const slot = job.data?.slot || '0600';
     const briefingKey = `${dateStr}_${slot}`;
-
-    // Deduplication guard
     if (this.sentBriefings.has(briefingKey) && !job.data?.force) {
       this.logger.log(`Morning briefing for ${briefingKey} already sent. Skipping duplicate.`);
       return { skipped: true, duplicate: true };
     }
 
+    const recipients = await this.getDeduplicatedRecipients();
+    const broadcastResult = await this.broadcastToRecipients(recipients, messageHtml);
+
+    if (broadcastResult.success) {
+      this.sentBriefings.add(briefingKey);
+    }
+
+    return broadcastResult;
+  }
+
+  private async getDeduplicatedRecipients(): Promise<string[]> {
+    const recipientSet = new Set<string>();
+
+    if (this.prisma.telegramSubscriber) {
+      const subscribers = await this.prisma.telegramSubscriber.findMany({
+        where: { is_active: true },
+        select: { chat_id: true },
+      });
+      for (const s of subscribers) {
+        if (s.chat_id) recipientSet.add(s.chat_id);
+      }
+    }
+
+    const defaultChatId = process.env.TELEGRAM_CHAT_ID;
+    if (defaultChatId && !defaultChatId.includes('your_telegram_chat_id')) {
+      recipientSet.add(defaultChatId);
+    }
+
+    return Array.from(recipientSet);
+  }
+
+  private async broadcastToRecipients(
+    chatIds: string[],
+    messageHtml: string,
+  ): Promise<TelegramSendResult & { deliveredCount: number; totalRecipients: number; deactivatedCount: number }> {
+    // Fallback to legacy single sendMessage if no explicit recipients resolved or in mocked legacy tests
+    if (chatIds.length === 0 || !this.telegramService.sendMessageToChat) {
+      const res = await this.telegramService.sendMessage(messageHtml);
+      return {
+        ...res,
+        deliveredCount: res.success ? 1 : 0,
+        totalRecipients: chatIds.length || 1,
+        deactivatedCount: 0,
+      };
+    }
+
+    let deliveredCount = 0;
+    let deactivatedCount = 0;
+    let firstSuccessId: number | undefined;
+    let lastError: string | undefined;
+
+    for (const chatId of chatIds) {
+      const res = await this.telegramService.sendMessageToChat(chatId, messageHtml);
+      if (res.success) {
+        deliveredCount++;
+        if (firstSuccessId === undefined) firstSuccessId = res.messageId;
+      } else {
+        lastError = res.error;
+        if (
+          res.errorCode === 403 ||
+          (res.error && /forbidden|blocked/i.test(res.error))
+        ) {
+          this.logger.warn(
+            `Subscriber ${chatId} blocked the bot (403). Marking is_active=false cleanly.`,
+          );
+          if (this.prisma.telegramSubscriber) {
+            await this.prisma.telegramSubscriber.updateMany({
+              where: { chat_id: chatId },
+              data: { is_active: false },
+            });
+          }
+          deactivatedCount++;
+        }
+      }
+    }
+
+    return {
+      success: deliveredCount > 0,
+      messageId: firstSuccessId,
+      error: deliveredCount > 0 ? undefined : lastError,
+      deliveredCount,
+      totalRecipients: chatIds.length,
+      deactivatedCount,
+    };
+  }
+
+  private async buildLegacyFallbackBriefing(): Promise<{ dateStr: string; html: string } | null> {
+    const recentPrices = await this.prisma.rawMarketPrice.findMany({
+      orderBy: { price_date: 'desc' },
+      take: 2,
+    });
+
+    if (recentPrices.length === 0) return null;
+
+    const latest = recentPrices[0];
+    const prev = recentPrices.length > 1 ? recentPrices[1] : null;
+    const dateStr = latest.price_date.toISOString().split('T')[0];
+
     const daklak = latest.price_daklak.toNumber();
     const prevDaklak = prev ? prev.price_daklak.toNumber() : daklak;
     const dodChangePct = prevDaklak > 0 ? (daklak - prevDaklak) / prevDaklak : 0;
 
-    // 2. Fetch corresponding daily signal
     const signal = await this.prisma.dailySignal.findUnique({
       where: { signal_date: latest.price_date },
     });
 
     const londonM1 = latest.london_m1 ? latest.london_m1.toNumber() : null;
     const londonM6 = latest.london_m6 ? latest.london_m6.toNumber() : null;
-    const spread = signal?.spread ? signal.spread.toNumber() : (londonM1 && londonM6 ? londonM1 - londonM6 : null);
+    const spread = signal?.spread
+      ? signal.spread.toNumber()
+      : londonM1 && londonM6
+      ? londonM1 - londonM6
+      : null;
 
-    // 3. Fetch latest successful forecast run if available
-    let forecastSummary: string | undefined;
-    try {
-      const latestForecast = this.prisma.forecastRun
-        ? await this.prisma.forecastRun.findFirst({
-            where: { status: 'SUCCESS' },
-            orderBy: { forecast_date: 'desc' },
-            include: {
-              predictions: {
-                orderBy: { horizon_week: 'asc' },
-              },
-            },
-          })
-        : null;
-
-      if (latestForecast && latestForecast.predictions && latestForecast.predictions.length > 0) {
-        const p4 = latestForecast.predictions.find((p) => p.horizon_week === 4);
-        const p12 = latestForecast.predictions.find((p) => p.horizon_week === 12);
-        const p26 = latestForecast.predictions.find((p) => p.horizon_week === 26);
-
-        const items: string[] = [];
-        if (p4) {
-          items.push(`\n  • 1 Tháng (T+4): <b>${Math.round(p4.pred_p50.toNumber()).toLocaleString('vi-VN')}</b> đ/kg (P10-P90: ${Math.round(p4.pred_p10.toNumber()).toLocaleString('vi-VN')} - ${Math.round(p4.pred_p90.toNumber()).toLocaleString('vi-VN')})`);
-        }
-        if (p12) {
-          items.push(`\n  • 3 Tháng (T+12): <b>${Math.round(p12.pred_p50.toNumber()).toLocaleString('vi-VN')}</b> đ/kg (P10-P90: ${Math.round(p12.pred_p10.toNumber()).toLocaleString('vi-VN')} - ${Math.round(p12.pred_p90.toNumber()).toLocaleString('vi-VN')})`);
-        }
-        if (p26) {
-          items.push(`\n  • 6 Tháng (T+26): <b>${Math.round(p26.pred_p50.toNumber()).toLocaleString('vi-VN')}</b> đ/kg (P10-P90: ${Math.round(p26.pred_p10.toNumber()).toLocaleString('vi-VN')} - ${Math.round(p26.pred_p90.toNumber()).toLocaleString('vi-VN')})`);
-        }
-        if (items.length > 0) {
-          forecastSummary = items.join('');
-        }
-      }
-    } catch (fErr: any) {
-      this.logger.warn(`Could not load latest forecast for morning briefing: ${fErr.message}`);
-    }
-
-    const messageHtml = AlertFormatter.formatMorningBriefing({
+    const html = AlertFormatter.formatMorningBriefing({
       date: dateStr,
       daklakPrice: daklak,
       dodChangePct,
@@ -129,15 +201,9 @@ export class AlertProcessor extends WorkerHost {
       basisVndKg: signal?.basis ? signal.basis.toNumber() : 0,
       regime: signal?.regime || 'NORMAL',
       volatility30d: signal?.volatility_30d ? signal.volatility_30d.toNumber() : null,
-      forecastSummary,
     });
 
-    const result = await this.telegramService.sendMessage(messageHtml);
-    if (result.success) {
-      this.sentBriefings.add(briefingKey);
-    }
-
-    return result;
+    return { dateStr, html };
   }
 
   /**
@@ -147,14 +213,14 @@ export class AlertProcessor extends WorkerHost {
     const data = job.data;
     const dateStr = data.signalDate;
 
-    // Deduplication guard: prevent duplicate alerts for the same date
     if (this.sentAnomalies.has(dateStr)) {
       this.logger.log(`Anomaly alert for ${dateStr} already dispatched. Skipping duplicate.`);
       return { skipped: true, duplicate: true };
     }
 
     const messageHtml = AlertFormatter.formatAnomalyAlert(data);
-    const result = await this.telegramService.sendMessage(messageHtml);
+    const recipients = await this.getDeduplicatedRecipients();
+    const result = await this.broadcastToRecipients(recipients, messageHtml);
 
     if (result.success) {
       this.sentAnomalies.add(dateStr);
@@ -164,7 +230,7 @@ export class AlertProcessor extends WorkerHost {
   }
 
   /**
-   * Handles critical System Failure Alert.
+   * Handles critical System Failure Alert (admin chat only).
    */
   private async handleSystemError(job: Job<SystemErrorData>): Promise<any> {
     const data = job.data;
