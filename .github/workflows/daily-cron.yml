@@ -1,0 +1,165 @@
+name: Coffee Tracker Cloud Cron
+
+on:
+  schedule:
+    # UTC = Asia/Ho_Chi_Minh (UTC+7) - 7 hours
+    - cron: '45 22 * * *' # 05:45 VN daily -> early Central Highlands weather sync
+    - cron: '55 22 * * *' # 05:55 VN daily -> morning Telegram briefing (before 06:00 VN)
+    - cron: '30 1 * * *'  # 08:30 VN daily -> domestic coffee prices & signals
+    - cron: '0 18 * * *'  # 01:00 VN daily -> ICE London night close & signals
+    - cron: '0 19 * * 0'  # 02:00 VN Monday (19:00 UTC Sunday) -> 26-week ML forecast
+    - cron: '0 20 4 * *'  # 03:00 VN 5th of month (20:00 UTC 4th) -> NOAA ONI & rainfall climate
+  workflow_dispatch:
+    inputs:
+      job:
+        description: 'Select Coffee Tracker pipeline job to execute manually'
+        required: true
+        default: 'weather'
+        type: choice
+        options:
+          - weather
+          - morning_briefing
+          - morning_domestic
+          - night_london
+          - weekly_forecast
+          - monthly_climate
+
+permissions:
+  contents: read
+
+concurrency:
+  group: coffee-tracker-cron-${{ github.event.schedule || inputs.job || 'manual' }}
+  cancel-in-progress: false
+
+jobs:
+  trigger-pipeline:
+    name: Wake & Trigger Coffee Tracker Job
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Resolve target job
+        id: resolve
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            JOB="${{ inputs.job }}"
+          else
+            case "${{ github.event.schedule }}" in
+              "45 22 * * *") JOB="weather" ;;
+              "55 22 * * *") JOB="morning_briefing" ;;
+              "30 1 * * *")  JOB="morning_domestic" ;;
+              "0 18 * * *")  JOB="night_london" ;;
+              "0 19 * * 0")  JOB="weekly_forecast" ;;
+              "0 20 4 * *")  JOB="monthly_climate" ;;
+              *)
+                echo "::error::Unmapped cron expression: ${{ github.event.schedule }}"
+                exit 1
+                ;;
+            esac
+          fi
+          echo "Resolved job: $JOB"
+          echo "job=$JOB" >> "$GITHUB_OUTPUT"
+
+      - name: Validate required secrets
+        shell: bash
+        env:
+          ORCHESTRATOR_URL: ${{ secrets.ORCHESTRATOR_URL }}
+          ADMIN_API_KEY: ${{ secrets.ADMIN_API_KEY }}
+        run: |
+          if [ -z "$ORCHESTRATOR_URL" ] || [ -z "$ADMIN_API_KEY" ]; then
+            echo "::error::Missing required GitHub Secrets: ORCHESTRATOR_URL and/or ADMIN_API_KEY."
+            exit 1
+          fi
+
+      - name: Wake Render Orchestrator (/health cold-start guard)
+        shell: bash
+        env:
+          ORCHESTRATOR_URL: ${{ secrets.ORCHESTRATOR_URL }}
+        run: |
+          BASE_URL="${ORCHESTRATOR_URL%/}"
+          for attempt in $(seq 1 15); do
+            echo "Pinging Orchestrator health ($attempt/15): $BASE_URL/health"
+            if curl -sf --max-time 10 "$BASE_URL/health" > /dev/null; then
+              echo "Orchestrator is awake and healthy!"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::Orchestrator failed to wake up within 150 seconds."
+          exit 1
+
+      - name: Wake Hugging Face ML Space before weekly forecast
+        if: steps.resolve.outputs.job == 'weekly_forecast'
+        shell: bash
+        env:
+          ML_SERVICE_URL: ${{ secrets.ML_SERVICE_URL }}
+        run: |
+          if [ -z "$ML_SERVICE_URL" ]; then
+            echo "ML_SERVICE_URL secret is not set; skipping dedicated ML Space wake-up (Orchestrator will wake via internal config)."
+            exit 0
+          fi
+          ML_BASE="${ML_SERVICE_URL%/}"
+          for attempt in $(seq 1 15); do
+            echo "Pinging ML Space health ($attempt/15): $ML_BASE/health"
+            if curl -sf --max-time 10 "$ML_BASE/health" > /dev/null; then
+              echo "ML Space is awake and ready!"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::ML Space failed to wake up within 150 seconds."
+          exit 1
+
+      - name: Execute authenticated Coffee Tracker endpoint
+        shell: bash
+        env:
+          ORCHESTRATOR_URL: ${{ secrets.ORCHESTRATOR_URL }}
+          ADMIN_API_KEY: ${{ secrets.ADMIN_API_KEY }}
+          TARGET_JOB: ${{ steps.resolve.outputs.job }}
+        run: |
+          BASE_URL="${ORCHESTRATOR_URL%/}"
+          TIMEOUT=60
+          BODY_FILE="$(mktemp)"
+
+          case "$TARGET_JOB" in
+            morning_briefing)
+              ENDPOINT="$BASE_URL/api/alerts/briefing/trigger"
+              STATUS=$(curl -sS -o "$BODY_FILE" -w "%{http_code}" \
+                --max-time "$TIMEOUT" \
+                -X POST "$ENDPOINT" \
+                -H "Content-Type: application/json" \
+                -H "X-Admin-Key: $ADMIN_API_KEY" \
+                -d '{"force":false}')
+              ;;
+            weekly_forecast)
+              TIMEOUT=240
+              ENDPOINT="$BASE_URL/api/forecast/trigger"
+              STATUS=$(curl -sS -o "$BODY_FILE" -w "%{http_code}" \
+                --max-time "$TIMEOUT" \
+                -X POST "$ENDPOINT" \
+                -H "X-Admin-Key: $ADMIN_API_KEY")
+              ;;
+            weather|morning_domestic|night_london|monthly_climate)
+              ENDPOINT="$BASE_URL/api/ingestion/sync?job=$TARGET_JOB"
+              STATUS=$(curl -sS -o "$BODY_FILE" -w "%{http_code}" \
+                --max-time "$TIMEOUT" \
+                -X POST "$ENDPOINT" \
+                -H "X-Admin-Key: $ADMIN_API_KEY")
+              ;;
+            *)
+              echo "::error::Unsupported job '$TARGET_JOB'"
+              exit 1
+              ;;
+          esac
+
+          echo "Endpoint: $ENDPOINT"
+          echo "HTTP Status: $STATUS"
+          echo "Response Body:"
+          cat "$BODY_FILE"
+          echo ""
+          rm -f "$BODY_FILE"
+
+          if [ "$STATUS" != "200" ] && [ "$STATUS" != "201" ] && [ "$STATUS" != "202" ]; then
+            echo "::error::Job '$TARGET_JOB' failed with HTTP status $STATUS"
+            exit 1
+          fi

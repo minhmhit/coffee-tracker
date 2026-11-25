@@ -24,8 +24,8 @@
 ## 2. Current Progress Tracker `[AUTO-UPDATE]`
 
 - **Active Phase:** Phase 7 — Cloud Hardening & Step-by-Step Free-Tier Deployment (Option A) (`IN PROGRESS`)
-- **Last Completed Step:** `STEP 7.1` (Cloud-Readiness Code Hardening — `AdminApiKeyGuard`, Throttling, CORS, Telegram Webhook, `QUEUE_MODE=direct`, HF Spaces Port/BLAS, Web ISR 300s)
-- **Next Step to Execute:** `STEP 7.2` (GitHub Actions Scheduled Pipelines & Deployment Runbook)
+- **Last Completed Step:** `STEP 7.2` (GitHub Actions Scheduled Pipelines, Cloud Blueprints & Deployment Runbook)
+- **Next Step to Execute:** `STEP 7.3` (Cloud Infrastructure Provisioning & Production Cutover)
 - **Overall Status:**
   - [x] Phase 0: Step 0.1 (Monorepo & Docker - DONE)
   - [x] Phase 0: Step 0.2 (DB Schema & Prisma - DONE)
@@ -51,7 +51,7 @@
   - [x] Phase 6: Step 6.4 (Free-Tier Cloud Deployment Research & `deploy_plan.md` - DONE)
   - [x] Phase 6: Step 6.5 (Telegram `@BotFather` Setup Guide & Interactive Verification - DONE)
   - [x] Phase 7: Step 7.1 (Cloud-Readiness Code Hardening for Orchestrator, ML Service & Web - DONE)
-  - [ ] Phase 7: Step 7.2 (GitHub Actions Scheduled Pipelines & Deployment Runbook)
+  - [x] Phase 7: Step 7.2 (GitHub Actions Scheduled Pipelines & Deployment Runbook - DONE)
   - [ ] Phase 7: Step 7.3 (Cloud Infrastructure Provisioning & Production Cutover)
 
 ---
@@ -95,6 +95,7 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
 - **Web Dockerization (`coffee_tracker_web`):** Standalone Next.js on `3000:3000`, `NEXT_PUBLIC_API_URL=http://localhost:3001`, `NEXT_PUBLIC_SITE_URL=http://localhost:3000`, `INTERNAL_API_URL=http://orchestrator:3001` (Confirmed in Step 6.3)
 - **Free-Tier Deployment Constraint:** Strictly zero credit card (`Option A`: Vercel + Neon + Upstash + Render Free + Hugging Face Spaces + GitHub Actions Cron + Telegram Webhook); personal scale `< 100` daily visits, `< 20` Telegram subscribers; blueprint documented in `deploy_plan.md` (Confirmed in Step 6.4)
 - **Cloud Security & Queue Defaults (Step 7.1):** Local `.env` keeps `QUEUE_MODE=bullmq` & `TELEGRAM_MODE=polling` by default when unset; `AdminApiKeyGuard` (`X-Admin-Key`) protects `POST /api/forecast/trigger`, `POST /api/admin/forecast/trigger`, `POST /api/alerts/briefing/trigger`, and `POST /api/ingestion/sync` (Confirmed in Step 7.1)
+- **GitHub Repository & Cloud Cron Scope (Step 7.2):** Target repo planned as **Public** (unlimited GitHub Actions minutes after scrubbing personal Telegram IDs from history); 6 scheduled + manual `workflow_dispatch` jobs confirmed (`weather`, `morning_briefing`, `morning_domestic`, `night_london`, `weekly_forecast`, `monthly_climate`) (Confirmed in Step 7.2)
 ---
 
 ## 4. Active Architecture State `[AUTO-UPDATE]`
@@ -201,3 +202,4 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
 | `STEP 6.4` | 2026-11-25 | 5-container resource benchmark (idle 409MiB, ML peak 171.7MiB/554% CPU), no-card $0 architecture blueprint in `deploy_plan.md` | [step_6_4_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_6_4_report.md) |
 | `STEP 6.5` | 2026-11-25 | Telegram `setMyCommands` auto-sync, `docs/telegram_bot_setup.md` guide, live `/start`/`/today`/`/stop` & DB verified, 11/11 Jest suites PASS | [step_6_5_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_6_5_report.md) |
 | `STEP 7.1` | 2026-11-25 | Cloud-readiness hardening: `AdminApiKeyGuard`, throttling, CORS, Telegram webhook, `QUEUE_MODE=direct`, HF Spaces port/BLAS, Web ISR 300s, 12/12 Jest PASS | [step_7_1_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_7_1_report.md) |
+| `STEP 7.2` | 2026-11-25 | GitHub Actions 6-cron + manual dispatch workflow, `render.yaml`, `apps/web/vercel.json`, `docs/deploy_runbook.md` & public-repo secret audit | [step_7_2_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_7_2_report.md) |
