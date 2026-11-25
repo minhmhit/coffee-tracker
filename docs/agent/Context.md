@@ -24,8 +24,8 @@
 ## 2. Current Progress Tracker `[AUTO-UPDATE]`
 
 - **Active Phase:** Phase 3 — Machine Learning & Probabilistic Forecasting
-- **Last Completed Step:** `STEP 3.1` (FastAPI Contract, Strict Pydantic v2 Schemas & Weekly Feature Pipeline)
-- **Next Step to Execute:** `STEP 3.2` (Econometric Leg: BVAR / VECM & Mandatory Baselines)
+- **Last Completed Step:** `STEP 3.2` (Econometric Leg: BVAR / VECM & Mandatory Baselines)
+- **Next Step to Execute:** `STEP 3.3` (Nonlinear Leg: Direct Multi-Horizon LightGBM Quantile Regression)
 - **Overall Status:**
   - [x] Phase 0: Step 0.1 (Monorepo & Docker)
   - [x] Phase 0: Step 0.2 (DB Schema & Prisma)
@@ -35,7 +35,8 @@
   - [x] Phase 2: Step 2.1 (Daily Signals Worker - DONE)
   - [x] Phase 2: Step 2.2 (Telegram Bot & Alerts - DONE)
   - [x] Phase 3: Step 3.1 (FastAPI Contract & Weekly Features - DONE)
-  - [ ] Phase 3: Step 3.2 (VECM/BVAR & Baselines) | Step 3.3 (LightGBM Quantile) | Step 3.4 (Walk-Forward Ensemble & Pytest)
+  - [x] Phase 3: Step 3.2 (VECM/BVAR & Baselines - DONE)
+  - [ ] Phase 3: Step 3.3 (LightGBM Quantile) | Step 3.4 (Walk-Forward Ensemble & Pytest)
   - [ ] Phase 4: Step 4.1 (NestJS Forecast Worker) | Step 4.2 (Dashboard REST APIs) | Step 4.3 (Next.js Dashboard & E2E Smoke Test)
 
 ---
@@ -66,6 +67,7 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
 - **Telegram Bot Config:** `TELEGRAM_BOT_TOKEN` & `TELEGRAM_CHAT_ID` configured in `.env`, standard HTML formatting, verified with live dispatch (Confirmed in Step 2.2)
 - **Minimum Historical Duration:** $\ge 156$ weeks (~3 years), HTTP 422 if less (Confirmed in Step 3.1)
 - **Daily Missing Gap Handling:** `ffill(limit=5)` before resampling to Friday close `W-FRI` (Confirmed in Step 3.1)
+- **Econometric Model Choice:** Option A (statsmodels VECM with Johansen rank >= 1, automatic fallback to Ridge-regularized VAR on log-differences with alpha=1.0) (Confirmed in Step 3.2)
 
 ---
 
@@ -75,7 +77,7 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
   - `coffee_tracker_postgres` (PostgreSQL 17 on port 5432) — Healthy
   - `coffee_tracker_redis` (Redis 7 on port 6379) — Healthy
   - `coffee_tracker_orchestrator` (NestJS on port 3001) — Healthy
-  - `coffee_tracker_ml_service` (FastAPI on port 8000) — Healthy (Pytest 11/11 tests PASS)
+  - `coffee_tracker_ml_service` (FastAPI on port 8000) — Healthy (Pytest 15/15 tests PASS)
 - **Database Tables Created & Active (PostgreSQL 17):**
   - `raw_market_prices`: **3,248 continuous records** (2018-01-01 to 2026-11-22).
   - `macro_climate_monthly`: **107 continuous monthly records** (2018-01-01 to 2026-11-01).
@@ -91,7 +93,11 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
   - `alert-queue`: Repeatable scheduler `morning_briefing_0845` (`45 8 * * *` Asia/Ho_Chi_Minh) + nhận job Anomaly Alert & System Error.
 - **FastAPI Endpoints Active:**
   - `GET /health` (Healthy)
-  - `POST /api/v1/forecast/weekly` (Strict Pydantic v2 Contract & Causal Feature Pipeline validated, 501 stubbed for Steps 3.2-3.4)
+  - `POST /api/v1/forecast/weekly` (Strict Pydantic v2 Contract & Causal Feature Pipeline validated)
+- **Forecasting Models Active (apps/ml-service):**
+  - `naive_random_walk` (Benchmark 1: Constant Y_t)
+  - `futures_implied_baseline` (Benchmark 2: Interpolated M1-M3-M6 + 52w mean basis)
+  - `econometric_forecast` (Leg 1: VECM rank >= 1, Ridge VAR fallback)
 - **NestJS API Endpoints Active:** `GET /health` (Healthy)
 - **NestJS Modules Active:** `HealthModule`, `PrismaModule` (Global), `IngestionModule`, `SignalsModule`, `AlertsModule`
 
@@ -104,6 +110,7 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
 - Toàn bộ các trường tài chính đều tuân thủ 100% Zero Float Principle (Prisma Decimal / PostgreSQL NUMERIC).
 - Telegram dispatch đã được xác minh gửi thực tế thành công tới chat ID người dùng qua Telegram Bot API (Message IDs 5, 6, 7).
 - Causal feature pipeline đã vượt qua 100% Leakage Canary Test (zero temporal data leakage).
+- Econometric Leg & Baselines đã vượt qua 100% các bài kiểm tra số học và tính đơn điệu phân vị (15/15 tests PASS).
 
 ---
 
@@ -120,3 +127,4 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
 | `STEP 2.1` | 2026-11-25 | Signals-queue worker, basis, spread, 30d vol, z-score, 3248 daily signals backfilled | [step_2_1_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_2_1_report.md) |
 | `STEP 2.2` | 2026-11-25 | Alert-queue worker, Telegram bot (Morning Briefing, Anomaly Alert, System Error), live dispatch PASS | [step_2_2_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_2_2_report.md) |
 | `STEP 3.1` | 2026-11-25 | FastAPI Pydantic v2 schemas, W-FRI causal feature pipeline, zero-leakage canary test, 11/11 Pytest PASS | [step_3_1_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_3_1_report.md) |
+| `STEP 3.2` | 2026-11-25 | Econometric Leg (VECM & Ridge VAR fallback), Naive RW & Futures Baseline, 15/15 Pytest PASS | [step_3_2_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_3_2_report.md) |
