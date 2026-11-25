@@ -12,7 +12,10 @@ import {
   TelegramOnboardingInfo,
 } from '../types';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_BASE =
+  typeof window === 'undefined'
+    ? process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+    : process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 async function safeFetch<T>(endpoint: string, fallback: T): Promise<T> {
   try {

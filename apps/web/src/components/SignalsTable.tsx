@@ -57,9 +57,9 @@ export const SignalsTable: React.FC<SignalsTableProps> = ({ signals }) => {
     >
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#E5E7EB] pb-3.5">
         <div>
-          <h3 className="font-serif text-[22px] text-[#111827] font-semibold">
+          <h2 className="font-serif text-[22px] text-[#111827] font-semibold">
             Tín hiệu Thị trường &amp; Cảnh báo Biến động
-          </h3>
+          </h2>
           <p className="text-[15px] text-[#52525B] mt-0.5">
             Theo dõi chênh lệch giá nội địa – London, chênh lệch kỳ hạn và cảnh báo biến động bất thường
           </p>

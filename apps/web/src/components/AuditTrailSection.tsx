@@ -49,9 +49,9 @@ export const AuditTrailSection: React.FC<AuditTrailSectionProps> = ({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E5E7EB] pb-3.5">
         <div>
-          <h3 className="font-serif text-[22px] text-[#111827] font-semibold">
+          <h2 className="font-serif text-[22px] text-[#111827] font-semibold">
             Kiểm định Mô hình Ngoài mẫu &amp; Nhật ký Hệ thống
-          </h3>
+          </h2>
           <p className="text-[15px] text-[#52525B] mt-0.5">
             Báo cáo trung thực sai số kiểm định Walk-Forward CV 1 năm và lịch sử các lần chạy dự báo
           </p>
@@ -117,9 +117,9 @@ export const AuditTrailSection: React.FC<AuditTrailSectionProps> = ({
 
       {/* Historical Forecast Runs Table */}
       <div className="space-y-2.5">
-        <h4 className="text-[15px] font-bold text-[#18181B]">
+        <h3 className="text-[15px] font-bold text-[#18181B]">
           Lịch sử các lần chạy mô hình dự báo
-        </h4>
+        </h3>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-[14px] font-mono">

@@ -24,8 +24,8 @@
 ## 2. Current Progress Tracker `[AUTO-UPDATE]`
 
 - **Active Phase:** Phase 6 — Editorial UI Integration (Stitch), SEO Optimization & Free-Tier Deployment Plan
-- **Last Completed Step:** `STEP 6.1` (Stitch AI Light-Editorial Integration & 4 Senior Hard Overrides)
-- **Next Step to Execute:** `STEP 6.2` (Technical SEO Audit, Rich Social Previews & Core Web Vitals Optimization)
+- **Last Completed Step:** `STEP 6.2` (Technical SEO Audit, Rich Social Previews & Core Web Vitals)
+- **Next Step to Execute:** `STEP 6.3` (Free-Tier Cloud Deployment Feasibility Research & `deploy_plan.md`)
 - **Overall Status:**
   - [x] Phase 0: Step 0.1 (Monorepo & Docker - DONE)
   - [x] Phase 0: Step 0.2 (DB Schema & Prisma - DONE)
@@ -46,7 +46,7 @@
   - [x] Phase 5: Step 5.3 (Telegram Self-Service & Enriched Briefing - DONE)
   - [x] Phase 5: Step 5.4 (UX Redesign & E2E Smoke Test - DONE)
   - [x] Phase 6: Step 6.1 (Stitch AI Light-Editorial Redesign & Senior Hard Overrides - DONE)
-  - [ ] Phase 6: Step 6.2 (Technical SEO, OpenGraph & Core Web Vitals)
+  - [x] Phase 6: Step 6.2 (Technical SEO, OpenGraph & Core Web Vitals - DONE)
   - [ ] Phase 6: Step 6.3 (Free-Tier Cloud Deployment Research & `deploy_plan.md`)
 
 ---
@@ -144,7 +144,7 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
   - `GET /api/stocks/robusta/history` (Historical ICE Certified Robusta stocks ?days=90)
   - `GET /api/insights/latest` (Explainable insights for Oil, ICE Stocks/Supply, FX, Weather/Climate + Forecast transparency)
 - **NextJS Frontend Active:**
-  - `http://localhost:3000` (Next.js 15 App Router — Stitch AI Light-Editorial Dashboard: `#FDFBF7` canvas, `Newsreader`/`Inter`/`JetBrains Mono` fonts, 4 Senior Hard Overrides, QR Telegram `next/image`, always-expanded Signals & Audit Trail with moved manual trigger and accurate MAPE `%`)
+  - `http://localhost:3000` (Next.js 15 Dynamic SSR App Router — Stitch AI Light-Editorial, full SEO `Metadata` + `opengraph-image.tsx` + `robots.ts` + `sitemap.ts` + JSON-LD, CLS=0, Lighthouse SEO 100 / A11y 100 / BP 100)
 - **NestJS Modules Active:** `HealthModule`, `PrismaModule` (Global), `IngestionModule`, `SignalsModule`, `AlertsModule`, `ForecastModule`, `InsightsModule`
 
 ---
@@ -184,3 +184,4 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
 | `STEP 5.3` | 2026-11-25 | Telegram Long-Polling bot (@minhmh_coffee_tracker_bot), /start /today /stop, enriched 4-section briefing (Msg 14), 11/11 Jest suites PASS | [step_5_3_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_5_3_report.md) |
 | `STEP 5.4` | 2026-11-25 | Light Editorial 5-tier UX redesign, QR Telegram onboarding, MAPE % fix, `next build` & backend API/DB E2E PASS | [step_5_4_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_5_4_report.md) |
 | `STEP 6.1` | 2026-11-25 | Integrated Stitch AI Light-Editorial (`#FDFBF7`, `Newsreader`/`Inter`), 4 Hard Overrides, `icon.svg`, zero-warning `lint` & `build` PASS | [step_6_1_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_6_1_report.md) |
+| `STEP 6.2` | 2026-11-25 | SEO Metadata, dynamic `robots.ts`/`sitemap.ts`/`opengraph-image.tsx`, JSON-LD, SSR hydration (CLS=0), Lighthouse 100 SEO/A11y/BP PASS | [step_6_2_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_6_2_report.md) |

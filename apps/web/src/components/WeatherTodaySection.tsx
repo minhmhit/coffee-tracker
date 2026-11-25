@@ -17,6 +17,7 @@ import { DailyWeatherItem, WeatherTodayResponse } from '../types';
 
 interface WeatherTodaySectionProps {
   weather: WeatherTodayResponse | null;
+  isLoading?: boolean;
 }
 
 function getWeatherIcon(code: number, className = 'w-6 h-6') {
@@ -46,7 +47,10 @@ function formatTemp(val: number | null): string {
   return `${val.toFixed(1)}°C`;
 }
 
-export const WeatherTodaySection: React.FC<WeatherTodaySectionProps> = ({ weather }) => {
+export const WeatherTodaySection: React.FC<WeatherTodaySectionProps> = ({
+  weather,
+  isLoading = false,
+}) => {
   const [selectedCode, setSelectedCode] = useState<string>('DAKLAK');
 
   useEffect(() => {
@@ -54,6 +58,23 @@ export const WeatherTodaySection: React.FC<WeatherTodaySectionProps> = ({ weathe
       setSelectedCode(weather.benchmark.province_code);
     }
   }, [weather?.benchmark?.province_code]);
+
+  if (isLoading && !weather) {
+    return (
+      <section
+        aria-label="Đang tải thời tiết Tây Nguyên hôm nay"
+        className="bg-white rounded-xl p-5 sm:p-6 border border-[#E5E7EB] shadow-sm space-y-5 min-h-[304px] animate-pulse"
+      >
+        <div className="h-12 bg-[#F5F3EF] rounded-xl" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-[92px] bg-[#F5F3EF] rounded-xl" />
+          ))}
+        </div>
+        <div className="h-20 bg-[#F5F3EF] rounded-xl" />
+      </section>
+    );
+  }
 
   if (!weather || !weather.provinces || weather.provinces.length === 0) {
     return (

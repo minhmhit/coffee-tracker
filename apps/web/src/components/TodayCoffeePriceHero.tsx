@@ -23,12 +23,24 @@ export const TodayCoffeePriceHero: React.FC<TodayCoffeePriceHeroProps> = ({ mark
   if (!market) {
     return (
       <section className="space-y-4" aria-label="Đang tải giá cà phê hôm nay">
-        <div className="h-14 bg-[#F5F3EF] rounded-xl animate-pulse" />
-        <div className="bg-white rounded-xl p-6 border border-[#E5E7EB] shadow-sm space-y-5 animate-pulse">
-          <div className="h-24 bg-[#F5F3EF] rounded-xl" />
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-3 pb-3 border-b border-[#E5E7EB]">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="inline-block w-2.5 h-2.5 rounded-full bg-[#166534]" />
+              <span className="text-[14px] uppercase tracking-wider text-[#166534] font-bold">
+                Thị trường Giao ngay Tây Nguyên
+              </span>
+            </div>
+            <h1 className="font-serif text-[28px] sm:text-[32px] text-[#111827] tracking-tight font-semibold leading-tight">
+              Giá Cà phê Hôm nay &amp; Dự báo Thị trường
+            </h1>
+          </div>
+        </div>
+        <div className="bg-white rounded-xl p-5 sm:p-6 border border-[#E5E7EB] shadow-sm space-y-5 animate-pulse min-h-[296px]">
+          <div className="h-[116px] bg-[#F5F3EF] rounded-xl" />
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-24 bg-[#F5F3EF] rounded-xl" />
+              <div key={i} className="h-[104px] bg-[#F5F3EF] rounded-xl" />
             ))}
           </div>
         </div>
@@ -102,7 +114,7 @@ export const TodayCoffeePriceHero: React.FC<TodayCoffeePriceHeroProps> = ({ mark
               <span className="text-[14px] text-[#52525B] font-medium">
                 7 ngày: {wowVnd > 0 ? '+' : ''}
                 {formatVnd(wowVnd)} đ ({wowPct > 0 ? '+' : ''}
-                {wowPct.toFixed(2)}%)
+                {(wowPct * 100).toFixed(2)}%)
               </span>
             </div>
 
@@ -127,7 +139,7 @@ export const TodayCoffeePriceHero: React.FC<TodayCoffeePriceHeroProps> = ({ mark
                 <span>
                   {dodVnd > 0 ? '+' : ''}
                   {formatVnd(dodVnd)} đ ({dodPct > 0 ? '+' : ''}
-                  {dodPct.toFixed(2)}%)
+                  {(dodPct * 100).toFixed(2)}%)
                 </span>
                 <span className="font-sans font-medium text-[14px]">so với hôm qua</span>
               </div>

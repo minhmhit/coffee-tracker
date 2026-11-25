@@ -5,6 +5,7 @@ import { InsightFactorCard, MarketInsightsResponse, OverallStance } from '../typ
 
 interface MarketInsightsPanelProps {
   insights: MarketInsightsResponse | null;
+  isLoading?: boolean;
 }
 
 const FACTOR_META: Record<
@@ -78,7 +79,24 @@ function formatExplainText(text: string): string {
     .replace(/CONTANGO_MILD:/gi, 'Nguồn cung ổn định (Contango nhẹ):');
 }
 
-export const MarketInsightsPanel: React.FC<MarketInsightsPanelProps> = ({ insights }) => {
+export const MarketInsightsPanel: React.FC<MarketInsightsPanelProps> = ({
+  insights,
+  isLoading = false,
+}) => {
+  if (isLoading && !insights) {
+    return (
+      <section aria-label="Đang tải nhận định thị trường" className="space-y-4 min-h-[560px] animate-pulse">
+        <div className="h-14 bg-[#F5F3EF] rounded-xl" />
+        <div className="h-28 bg-white rounded-xl border border-[#E5E7EB]" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-[200px] bg-white rounded-xl border border-[#E5E7EB]" />
+          ))}
+        </div>
+      </section>
+    );
+  }
+
   if (!insights) {
     return (
       <section className="bg-white rounded-xl p-6 border border-[#E5E7EB] shadow-sm">

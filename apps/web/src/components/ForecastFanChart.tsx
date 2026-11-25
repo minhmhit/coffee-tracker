@@ -11,13 +11,32 @@ import {
 interface ForecastFanChartProps {
   forecast: ForecastLatest | null;
   transparency?: ForecastTransparencySummary | null;
+  isLoading?: boolean;
 }
 
 export const ForecastFanChart: React.FC<ForecastFanChartProps> = ({
   forecast,
   transparency,
+  isLoading = false,
 }) => {
   const [hoveredPoint, setHoveredPoint] = useState<HorizonPrediction | null>(null);
+
+  if (isLoading && !forecast) {
+    return (
+      <section
+        aria-label="Đang tải dự báo giá cà phê 6 tháng"
+        className="bg-white p-5 sm:p-6 rounded-xl border border-[#E5E7EB] shadow-sm space-y-5 min-h-[620px] animate-pulse"
+      >
+        <div className="h-12 bg-[#F5F3EF] rounded-xl" />
+        <div className="h-[310px] bg-[#F5F3EF] rounded-xl" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-[120px] bg-[#F5F3EF] rounded-xl" />
+          ))}
+        </div>
+      </section>
+    );
+  }
 
   if (!forecast || !forecast.predictions || forecast.predictions.length === 0) {
     return (

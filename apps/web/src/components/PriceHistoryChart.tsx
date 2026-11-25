@@ -7,12 +7,14 @@ interface PriceHistoryChartProps {
   history: MarketHistoryPoint[];
   currentRange: string;
   onRangeChange: (range: string) => void;
+  isLoading?: boolean;
 }
 
 export const PriceHistoryChart: React.FC<PriceHistoryChartProps> = ({
   history,
   currentRange,
   onRangeChange,
+  isLoading = false,
 }) => {
   const [hoveredPoint, setHoveredPoint] = useState<MarketHistoryPoint | null>(null);
   const [activeSeries, setActiveSeries] = useState<Record<string, boolean>>({
@@ -26,6 +28,23 @@ export const PriceHistoryChart: React.FC<PriceHistoryChartProps> = ({
   const toggleSeries = (key: string) => {
     setActiveSeries((prev) => ({ ...prev, [key]: !prev[key] }));
   };
+
+  if (isLoading && (!history || history.length === 0)) {
+    return (
+      <section
+        aria-label="Đang tải biểu đồ lịch sử giá cà phê"
+        className="bg-white rounded-xl p-5 sm:p-6 border border-[#E5E7EB] shadow-sm space-y-5 min-h-[460px] animate-pulse"
+      >
+        <div className="h-12 bg-[#F5F3EF] rounded-xl" />
+        <div className="h-[290px] bg-[#F5F3EF] rounded-xl" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-16 bg-[#F5F3EF] rounded-lg" />
+          ))}
+        </div>
+      </section>
+    );
+  }
 
   if (!history || history.length === 0) {
     return (
@@ -135,9 +154,9 @@ export const PriceHistoryChart: React.FC<PriceHistoryChartProps> = ({
       {/* Header and Range Selector */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div>
-          <h3 className="font-serif text-[22px] text-[#111827] font-semibold">
+          <h2 className="font-serif text-[22px] text-[#111827] font-semibold">
             Diễn biến Giá Lịch sử Nội địa &amp; Sàn London
-          </h3>
+          </h2>
           <p className="text-[15px] text-[#52525B] mt-0.5">
             So sánh giá thu mua thực tế Tây Nguyên và giá kỳ hạn London quy đổi sang đ/kg
           </p>
@@ -155,11 +174,10 @@ export const PriceHistoryChart: React.FC<PriceHistoryChartProps> = ({
               key={r.value}
               type="button"
               onClick={() => onRangeChange(r.value)}
-              className={`px-3 py-1.5 rounded-lg font-semibold transition-all ${
-                currentRange === r.value
+              className={`px-3 py-1.5 rounded-lg font-semibold transition-all ${currentRange === r.value
                   ? 'bg-white text-[#111827] shadow-sm border border-[#E5E7EB]'
                   : 'text-[#52525B] hover:text-[#111827]'
-              }`}
+                }`}
             >
               {r.label}
             </button>
@@ -174,11 +192,10 @@ export const PriceHistoryChart: React.FC<PriceHistoryChartProps> = ({
             key={chip.key}
             type="button"
             onClick={() => toggleSeries(chip.key)}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border font-medium transition-colors ${
-              activeSeries[chip.key]
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border font-medium transition-colors ${activeSeries[chip.key]
                 ? chip.activeCls
                 : 'bg-[#FBF9F5] text-[#52525B] border-[#E5E7EB]'
-            }`}
+              }`}
           >
             <span className={`w-2.5 h-2.5 rounded-full ${chip.dot}`} />
             <span>{chip.label}</span>
