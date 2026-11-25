@@ -1,7 +1,9 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { ALERT_JOBS, ALERT_QUEUE_NAME } from '../../signals/signals.constants';
+import { isDirectQueueMode } from '../../common/queue-mode';
+import { AlertProcessor } from '../processors/alert.processor';
 
 export const ALERT_CRONS = {
   MORNING_BRIEFING: process.env.TELEGRAM_BRIEFING_CRON || '0 6 * * *', // 06:00 AM Asia/Ho_Chi_Minh daily (mỗi 6h sáng)
@@ -16,9 +18,14 @@ export class AlertScheduler implements OnModuleInit {
   constructor(
     @InjectQueue(ALERT_QUEUE_NAME)
     private readonly alertQueue: Queue,
+    @Optional() private readonly alertProcessor?: AlertProcessor,
   ) {}
 
   async onModuleInit() {
+    if (isDirectQueueMode()) {
+      this.logger.log('Skipped AlertScheduler BullMQ cron registration (QUEUE_MODE=direct).');
+      return;
+    }
     await this.registerRepeatableJobs();
   }
 
@@ -57,9 +64,24 @@ export class AlertScheduler implements OnModuleInit {
   }
 
   /**
-   * Helper to manually dispatch an immediate morning briefing.
+   * Dispatches an immediate morning briefing via direct execution (QUEUE_MODE=direct)
+   * or BullMQ alert-queue (default).
    */
   async triggerImmediateBriefing(force = false) {
+    if (isDirectQueueMode() && this.alertProcessor) {
+      this.logger.log('Executing morning briefing dispatch directly (QUEUE_MODE=direct)...');
+      const result = await this.alertProcessor.executeMorningBriefing({
+        slot: '0600',
+        force,
+        trigger: 'direct_http_trigger',
+      });
+      return {
+        id: `direct-${Date.now()}`,
+        mode: 'direct',
+        ...result,
+      };
+    }
+
     this.logger.log('Triggering immediate morning briefing dispatch...');
     return this.alertQueue.add(
       ALERT_JOBS.MORNING_BRIEFING,

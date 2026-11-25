@@ -23,9 +23,9 @@
 
 ## 2. Current Progress Tracker `[AUTO-UPDATE]`
 
-- **Active Phase:** Phase 6 — Editorial UI Integration (Stitch), SEO Optimization & Deployment Readiness (`ALL PHASES COMPLETE`)
-- **Last Completed Step:** `STEP 6.5` (Telegram Bot `@BotFather` Guide, `setMyCommands` Auto-Sync & Interactive Verification)
-- **Next Step to Execute:** `NONE — ALL PHASES (0–6) COMPLETE`
+- **Active Phase:** Phase 7 — Cloud Hardening & Step-by-Step Free-Tier Deployment (Option A) (`IN PROGRESS`)
+- **Last Completed Step:** `STEP 7.1` (Cloud-Readiness Code Hardening — `AdminApiKeyGuard`, Throttling, CORS, Telegram Webhook, `QUEUE_MODE=direct`, HF Spaces Port/BLAS, Web ISR 300s)
+- **Next Step to Execute:** `STEP 7.2` (GitHub Actions Scheduled Pipelines & Deployment Runbook)
 - **Overall Status:**
   - [x] Phase 0: Step 0.1 (Monorepo & Docker - DONE)
   - [x] Phase 0: Step 0.2 (DB Schema & Prisma - DONE)
@@ -50,6 +50,9 @@
   - [x] Phase 6: Step 6.3 (Production Dockerfile & Docker Compose Integration for `apps/web` - DONE)
   - [x] Phase 6: Step 6.4 (Free-Tier Cloud Deployment Research & `deploy_plan.md` - DONE)
   - [x] Phase 6: Step 6.5 (Telegram `@BotFather` Setup Guide & Interactive Verification - DONE)
+  - [x] Phase 7: Step 7.1 (Cloud-Readiness Code Hardening for Orchestrator, ML Service & Web - DONE)
+  - [ ] Phase 7: Step 7.2 (GitHub Actions Scheduled Pipelines & Deployment Runbook)
+  - [ ] Phase 7: Step 7.3 (Cloud Infrastructure Provisioning & Production Cutover)
 
 ---
 
@@ -91,6 +94,7 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
 - **Stitch AI Editorial System & Senior Overrides:** Integrated from `docs/design/stitch/stitch_vietnamese_coffee_market_dashboard/` (`#FDFBF7` canvas, `#FFFFFF` cards, `#166534`/`#991B1B` accents, `Newsreader`/`Inter`/`JetBrains Mono` fonts); Choice B (always-expanded bottom `SignalsTable` & `AuditTrailSection`); direct `%` formatting for `wf_mape_*` matching `forecast_runs` (`1.36`, `2.45`, `5.68`) (Confirmed in Step 6.1)
 - **Web Dockerization (`coffee_tracker_web`):** Standalone Next.js on `3000:3000`, `NEXT_PUBLIC_API_URL=http://localhost:3001`, `NEXT_PUBLIC_SITE_URL=http://localhost:3000`, `INTERNAL_API_URL=http://orchestrator:3001` (Confirmed in Step 6.3)
 - **Free-Tier Deployment Constraint:** Strictly zero credit card (`Option A`: Vercel + Neon + Upstash + Render Free + Hugging Face Spaces + GitHub Actions Cron + Telegram Webhook); personal scale `< 100` daily visits, `< 20` Telegram subscribers; blueprint documented in `deploy_plan.md` (Confirmed in Step 6.4)
+- **Cloud Security & Queue Defaults (Step 7.1):** Local `.env` keeps `QUEUE_MODE=bullmq` & `TELEGRAM_MODE=polling` by default when unset; `AdminApiKeyGuard` (`X-Admin-Key`) protects `POST /api/forecast/trigger`, `POST /api/admin/forecast/trigger`, `POST /api/alerts/briefing/trigger`, and `POST /api/ingestion/sync` (Confirmed in Step 7.1)
 ---
 
 ## 4. Active Architecture State `[AUTO-UPDATE]`
@@ -100,7 +104,7 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
   - `coffee_tracker_redis` (Redis 7 on port 6379) — Healthy
   - `coffee_tracker_orchestrator` (NestJS on port 3001) — Healthy
   - `coffee_tracker_ml_service` (FastAPI on port 8000) — Healthy (Pytest 19/19 tests PASS, Live 200 response ~10.6s)
-  - `coffee_tracker_web` (Next.js 15 Standalone on port 3000, non-root `nextjs:nodejs`, image `282MB`) — Healthy
+  - `coffee_tracker_web` (Next.js 15 Standalone on port 3000, non-root `nextjs:nodejs`, image `282MB`, ISR `300s`) — Healthy
 - **Database Tables Created & Active (PostgreSQL 17):**
   - `raw_market_prices`: **3,248 continuous records** (2018-01-01 to 2026-11-22).
   - `macro_climate_monthly`: **107 continuous monthly records** (2018-01-01 to 2026-11-01).
@@ -137,8 +141,11 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
   - `GET /api/forecast/latest` (Latest successful 26w forecast + origin price + metrics)
   - `GET /api/forecast/runs` (Paginated forecast runs audit trail)
   - `GET /api/forecast/runs/:runId` (Specific forecast run with 26 predictions)
-  - `POST /api/forecast/trigger` (Manual forecast trigger)
-  - `POST /api/alerts/briefing/trigger` (Manual 06:00 AM briefing trigger to Telegram)
+  - `POST /api/forecast/trigger` (Guarded by `X-Admin-Key`, Rate limit 5/min, supports BullMQ + `QUEUE_MODE=direct` ML wake-up)
+  - `POST /api/admin/forecast/trigger` (Guarded by `X-Admin-Key`, Rate limit 5/min)
+  - `POST /api/ingestion/sync` (Guarded by `X-Admin-Key`, Rate limit 5/min, `?job=weather|morning_domestic|night_london|monthly_climate|daily_ice_stocks`)
+  - `POST /api/alerts/briefing/trigger` (Guarded by `X-Admin-Key`, Rate limit 5/min, Manual 06:00 AM briefing trigger to Telegram)
+  - `POST /api/alerts/telegram/webhook` (Guarded by `X-Telegram-Bot-Api-Secret-Token`, Rate limit 30/min, cloud webhook receiver)
   - `GET /api/alerts/status` (Telegram alerting config and 06:00 AM cron schedule status)
   - `GET /api/alerts/telegram-info` (Telegram onboarding botUsername, deepLink, commands & live briefing preview)
   - `GET /api/climate/latest` (Latest monthly climate anomaly)
@@ -149,7 +156,7 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
   - `GET /api/stocks/robusta/history` (Historical ICE Certified Robusta stocks ?days=90)
   - `GET /api/insights/latest` (Explainable insights for Oil, ICE Stocks/Supply, FX, Weather/Climate + Forecast transparency)
 - **NextJS Frontend Active:**
-  - `http://localhost:3000` (Next.js 15 Dynamic SSR App Router — Stitch AI Light-Editorial, full SEO `Metadata` + `opengraph-image.tsx` + `robots.ts` + `sitemap.ts` + JSON-LD, CLS=0, Lighthouse SEO 100 / A11y 100 / BP 100)
+  - `http://localhost:3000` (Next.js 15 App Router with `revalidate = 300` ISR & `3500ms` server fetch timeout — Stitch AI Light-Editorial, full SEO `Metadata` + `opengraph-image.tsx` + `robots.ts` + `sitemap.ts` + JSON-LD, CLS=0)
 - **NestJS Modules Active:** `HealthModule`, `PrismaModule` (Global), `IngestionModule`, `SignalsModule`, `AlertsModule`, `ForecastModule`, `InsightsModule`
 
 ---
@@ -193,3 +200,4 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
 | `STEP 6.3` | 2026-11-25 | Next.js standalone Dockerfile (`node:20-alpine` runner, 282MB), `coffee_tracker_web` in Compose, 5/5 containers Healthy PASS | [step_6_3_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_6_3_report.md) |
 | `STEP 6.4` | 2026-11-25 | 5-container resource benchmark (idle 409MiB, ML peak 171.7MiB/554% CPU), no-card $0 architecture blueprint in `deploy_plan.md` | [step_6_4_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_6_4_report.md) |
 | `STEP 6.5` | 2026-11-25 | Telegram `setMyCommands` auto-sync, `docs/telegram_bot_setup.md` guide, live `/start`/`/today`/`/stop` & DB verified, 11/11 Jest suites PASS | [step_6_5_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_6_5_report.md) |
+| `STEP 7.1` | 2026-11-25 | Cloud-readiness hardening: `AdminApiKeyGuard`, throttling, CORS, Telegram webhook, `QUEUE_MODE=direct`, HF Spaces port/BLAS, Web ISR 300s, 12/12 Jest PASS | [step_7_1_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_7_1_report.md) |

@@ -3,10 +3,12 @@ import { Job } from 'bullmq';
 import { Logger } from '@nestjs/common';
 import { FORECAST_JOBS, FORECAST_QUEUE_NAME, FORECAST_WORKER_CONFIG } from '../forecast.constants';
 import { ForecastService } from '../forecast.service';
+import { getBullWorkerOptions, isDirectQueueMode } from '../../common/queue-mode';
 
-@Processor(FORECAST_QUEUE_NAME, {
-  lockDuration: FORECAST_WORKER_CONFIG.lockDuration,
-})
+@Processor(
+  FORECAST_QUEUE_NAME,
+  getBullWorkerOptions({ lockDuration: FORECAST_WORKER_CONFIG.lockDuration }),
+)
 export class ForecastProcessor extends WorkerHost {
   private readonly logger = new Logger(ForecastProcessor.name);
 
@@ -22,6 +24,10 @@ export class ForecastProcessor extends WorkerHost {
     let forecastDate = new Date();
 
     try {
+      if (isDirectQueueMode() || process.env.ML_WAKE_BEFORE_FORECAST === 'true') {
+        await this.forecastService.wakeMlService();
+      }
+
       // 1. Build payload from PostgreSQL
       const payload = await this.forecastService.buildForecastPayload();
       forecastDate = new Date(payload.run_date);

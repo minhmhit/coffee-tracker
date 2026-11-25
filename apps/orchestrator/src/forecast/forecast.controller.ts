@@ -7,8 +7,11 @@ import {
   HttpCode,
   HttpStatus,
   NotFoundException,
+  UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ForecastService } from './forecast.service';
+import { AdminApiKeyGuard } from '../common/guards/admin-api-key.guard';
 
 @Controller('api/forecast')
 export class ForecastController {
@@ -53,14 +56,21 @@ export class ForecastController {
 
   /**
    * Endpoint to trigger immediate weekly forecast computation.
+   * Guarded by X-Admin-Key to protect Hugging Face Spaces ML compute.
    */
   @Post('trigger')
+  @UseGuards(AdminApiKeyGuard)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @HttpCode(HttpStatus.ACCEPTED)
   async triggerForecast() {
-    const job = await this.forecastService.triggerForecast('api_trigger');
+    const job: any = await this.forecastService.triggerForecast('api_trigger');
     return {
       success: true,
-      message: 'Weekly forecast job successfully enqueued to forecast-queue',
+      mode: job?.mode || 'bullmq',
+      message:
+        job?.mode === 'direct'
+          ? 'Weekly forecast executed directly (QUEUE_MODE=direct)'
+          : 'Weekly forecast job successfully enqueued to forecast-queue',
       jobId: job.id,
     };
   }
@@ -72,14 +82,21 @@ export class AdminForecastController {
 
   /**
    * Manual admin endpoint to trigger immediate weekly forecast computation.
+   * Guarded by X-Admin-Key to protect Hugging Face Spaces ML compute.
    */
   @Post('trigger')
+  @UseGuards(AdminApiKeyGuard)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @HttpCode(HttpStatus.ACCEPTED)
   async triggerForecast() {
-    const job = await this.forecastService.triggerForecast('admin_api_trigger');
+    const job: any = await this.forecastService.triggerForecast('admin_api_trigger');
     return {
       success: true,
-      message: 'Weekly forecast job successfully enqueued to forecast-queue',
+      mode: job?.mode || 'bullmq',
+      message:
+        job?.mode === 'direct'
+          ? 'Weekly forecast executed directly (QUEUE_MODE=direct)'
+          : 'Weekly forecast job successfully enqueued to forecast-queue',
       jobId: job.id,
     };
   }

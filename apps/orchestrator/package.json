@@ -23,6 +23,7 @@
     "@nestjs/common": "^11.0.10",
     "@nestjs/core": "^11.0.10",
     "@nestjs/platform-express": "^11.0.10",
+    "@nestjs/throttler": "^6.8.0",
     "@prisma/client": "^6.4.0",
     "bullmq": "^6.7.8",
     "cheerio": "^1.2.0",

@@ -9,13 +9,14 @@ import {
   SIGNALS_QUEUE_NAME,
 } from '../signals.constants';
 import { SignalsService } from '../signals.service';
+import { getBullWorkerOptions } from '../../common/queue-mode';
 
 export interface ComputeSignalsJobPayload {
   targetDate: string; // YYYY-MM-DD
   trigger?: string;
 }
 
-@Processor(SIGNALS_QUEUE_NAME)
+@Processor(SIGNALS_QUEUE_NAME, getBullWorkerOptions())
 export class SignalsProcessor extends WorkerHost {
   private readonly logger = new Logger(SignalsProcessor.name);
 

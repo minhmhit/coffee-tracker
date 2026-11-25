@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { TelegramBotCommand, TelegramService } from './telegram.service';
 import { MorningBriefingService } from './morning-briefing.service';
 import { AlertFormatter } from './alert-formatter';
+import { isWebhookTelegramMode } from '../common/queue-mode';
 
 export const DEFAULT_TELEGRAM_COMMANDS: TelegramBotCommand[] = [
   {
@@ -67,11 +68,12 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
   startPolling(): void {
     if (this.isPolling) return;
     if (
+      isWebhookTelegramMode() ||
       process.env.NODE_ENV === 'test' ||
       process.env.TELEGRAM_POLLING_ENABLED === 'false' ||
       !this.telegramService.isConfigured()
     ) {
-      this.logger.log('Telegram long-polling skipped (disabled or unconfigured).');
+      this.logger.log('Telegram long-polling skipped (webhook mode, disabled, or unconfigured).');
       return;
     }
 

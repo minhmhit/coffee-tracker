@@ -17,13 +17,18 @@ import { MarketController } from './market.controller';
 import { ClimateController } from './climate.controller';
 import { WeatherController } from './weather.controller';
 import { StocksController } from './stocks.controller';
+import { IngestionController } from './ingestion.controller';
 import { PrismaModule } from '../prisma/prisma.module';
+import { SignalsModule } from '../signals/signals.module';
+import { AlertsModule } from '../alerts/alerts.module';
 import { INGESTION_QUEUE_NAME } from './ingestion.constants';
 import { ALERT_QUEUE_NAME, SIGNALS_QUEUE_NAME } from '../signals/signals.constants';
 
 @Module({
   imports: [
     PrismaModule,
+    SignalsModule,
+    AlertsModule,
     BullModule.registerQueue(
       {
         name: INGESTION_QUEUE_NAME,
@@ -36,7 +41,13 @@ import { ALERT_QUEUE_NAME, SIGNALS_QUEUE_NAME } from '../signals/signals.constan
       },
     ),
   ],
-  controllers: [MarketController, ClimateController, WeatherController, StocksController],
+  controllers: [
+    MarketController,
+    ClimateController,
+    WeatherController,
+    StocksController,
+    IngestionController,
+  ],
   providers: [
     DomesticCoffeeAdapter,
     LondonRobustaAdapter,
@@ -54,6 +65,7 @@ import { ALERT_QUEUE_NAME, SIGNALS_QUEUE_NAME } from '../signals/signals.constan
   ],
   exports: [
     IngestionService,
+    IngestionProcessor,
     IngestionScheduler,
     PriceSanityValidator,
     IceStocksSanityValidator,
