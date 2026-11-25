@@ -24,15 +24,16 @@
 ## 2. Current Progress Tracker `[AUTO-UPDATE]`
 
 - **Active Phase:** Phase 2 — Daily Signals Worker & Telegram Alerting
-- **Last Completed Step:** `STEP 1.3` (Monthly Macro & Climate Ingestion: NOAA ONI & Rainfall Anomalies)
-- **Next Step to Execute:** `STEP 2.1` (Daily Signals Worker & Risk Metrics Engine: Basis, Spread, 30d Volatility, Z-Score)
+- **Last Completed Step:** `STEP 2.1` (Daily Signals Worker & Risk Metrics Engine: Basis, Spread, 30d Volatility, Z-Score, Regime)
+- **Next Step to Execute:** `STEP 2.2` (`alert-queue` Worker & Telegram Bot Notifications: Morning Briefing, Anomaly Alert, System Error)
 - **Overall Status:**
   - [x] Phase 0: Step 0.1 (Monorepo & Docker)
   - [x] Phase 0: Step 0.2 (DB Schema & Prisma)
   - [x] Phase 1: Step 1.1 (Scrapers & Validator - DONE)
   - [x] Phase 1: Step 1.2 (BullMQ Ingestion & Backfill - DONE)
   - [x] Phase 1: Step 1.3 (Macro & Climate Monthly - DONE)
-  - [ ] Phase 2: Step 2.1 (Daily Signals Worker) | Step 2.2 (Telegram Bot & Alerts)
+  - [x] Phase 2: Step 2.1 (Daily Signals Worker - DONE)
+  - [ ] Phase 2: Step 2.2 (Telegram Bot & Alerts)
   - [ ] Phase 3: Step 3.1 (FastAPI Contract & Weekly Features) | Step 3.2 (VECM/BVAR & Baselines) | Step 3.3 (LightGBM Quantile) | Step 3.4 (Walk-Forward Ensemble & Pytest)
   - [ ] Phase 4: Step 4.1 (NestJS Forecast Worker) | Step 4.2 (Dashboard REST APIs) | Step 4.3 (Next.js Dashboard & E2E Smoke Test)
 
@@ -58,6 +59,9 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
 - **Climate Representative Coordinates:** Đắk Lắk (`12.6667, 108.0500`); Brazil Linhares (`-19.3911, -40.0722`) (Confirmed in Step 1.3)
 - **Rainfall Baseline Period:** 2010–2020 (11-year monthly climatology mean from Open-Meteo) (Confirmed in Step 1.3)
 - **NOAA ONI Source:** `https://www.cpc.ncep.noaa.gov/data/indices/oni.ascii.txt` + local fallback cache (Confirmed in Step 1.3)
+- **Basis Formula:** $\text{DakLak} - (\frac{\text{LondonM1}}{1000} \times \text{USD\_VND})$ (Confirmed in Step 2.1)
+- **Regime Classification:** Rule-based theo Calendar Spread (M1 - M6): `BACKWARDATION_STRONG` (> 200), `BACKWARDATION_MILD` (0..200), `CONTANGO_MILD` (-150..0), `CONTANGO_STRONG` (< -150) (Confirmed in Step 2.1)
+- **Anomaly Detection Threshold:** $|Z\_score| > 2.5$ (Confirmed in Step 2.1)
 - **Telegram Bot Config:** `[PENDING ENV SETUP IN STEP 2.2]` (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`)
 
 ---
@@ -71,26 +75,28 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
   - `coffee_tracker_ml_service` (FastAPI on port 8000) — Healthy
 - **Database Tables Created & Active (PostgreSQL 17):**
   - `raw_market_prices`: **3,248 continuous records** (2018-01-01 to 2026-11-22).
-  - `macro_climate_monthly`: **107 continuous monthly records** (2018-01-01 to 2026-11-01). Columns: `month_date`, `oni_index`, `vn_rain_anomaly`, `br_rain_anomaly`, timestamps.
-  - `daily_signals`: 0 records (Target for Step 2.1).
-  - `forecast_runs`: 0 records.
-  - `forecast_predictions`: 0 records.
+  - `macro_climate_monthly`: **107 continuous monthly records** (2018-01-01 to 2026-11-01).
+  - `daily_signals`: **3,248 continuous records** (2018-01-01 to 2026-11-22). Columns: `signal_date`, `basis`, `spread`, `volatility_30d`, `z_score`, `is_anomaly`, `regime`, `notes`, timestamps.
+  - `forecast_runs`: 0 records (Target for Phase 3/4).
+  - `forecast_predictions`: 0 records (Target for Phase 3/4).
 - **BullMQ Queues Active:**
   - `ingestion-queue`: 3 repeatable schedulers:
     1. `morning_domestic_0830` (`30 8 * * *` Asia/Ho_Chi_Minh)
     2. `night_london_close_0100` (`0 1 * * *` Asia/Ho_Chi_Minh)
     3. `monthly_climate_05_0300` (`0 3 5 * *` Asia/Ho_Chi_Minh)
+  - `signals-queue`: Chained tự động sau ingestion job.
+  - `alert-queue`: Đăng ký sẵn sàng nhận job Anomaly Alert & System Error.
 - **FastAPI Endpoints Active:** `GET /health` (Healthy)
 - **NestJS API Endpoints Active:** `GET /health` (Healthy)
-- **NestJS Modules Active:** `HealthModule`, `PrismaModule` (Global), `IngestionModule` (Adapters, Validator, Service, Processor, Schedulers)
+- **NestJS Modules Active:** `HealthModule`, `PrismaModule` (Global), `IngestionModule`, `SignalsModule`
 
 ---
 
 ## 5. Known Issues, Technical Debt & Deviations `[AUTO-UPDATE]`
 
 - Không có lỗi tồn đọng.
-- Đã thiết lập cơ chế tự động Fallback Cache dự phòng cho cả NOAA và Open-Meteo nhằm triệt tiêu rủi ro gián đoạn mạng hoặc giới hạn session firewall/DrayTek router.
-- Toàn bộ dữ liệu bảng `raw_market_prices` (3.248 records) và `macro_climate_monthly` (107 records) đều tuân thủ 100% Zero Float Principle và Single Writer Principle.
+- Bảng `daily_signals` (3.248 dòng) đã được tính toán đồng bộ hoàn toàn với `raw_market_prices` (3.248 dòng).
+- Toàn bộ các trường tài chính đều tuân thủ 100% Zero Float Principle (Prisma Decimal / PostgreSQL NUMERIC).
 
 ---
 
@@ -104,3 +110,4 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
 | `STEP 1.1` | 2026-11-22 | Market scrapers, fallback adapters, sanity validator, 11/11 tests PASS, live dry-run PASS | [step_1_1_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_1_1_report.md) |
 | `STEP 1.2` | 2026-11-22 | BullMQ ingestion-queue, 2 cron schedulers, idempotent upsert, 3248 records backfilled | [step_1_2_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_1_2_report.md) |
 | `STEP 1.3` | 2026-11-25 | NOAA ONI & Open-Meteo rainfall anomaly ingestion, monthly cron, 107 records backfilled | [step_1_3_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_1_3_report.md) |
+| `STEP 2.1` | 2026-11-25 | Signals-queue worker, basis, spread, 30d vol, z-score, 3248 daily signals backfilled | [step_2_1_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_2_1_report.md) |

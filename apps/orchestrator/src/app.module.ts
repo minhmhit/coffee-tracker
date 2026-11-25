@@ -3,6 +3,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { HealthModule } from './health/health.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { IngestionModule } from './ingestion/ingestion.module';
+import { SignalsModule } from './signals/signals.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { IngestionModule } from './ingestion/ingestion.module';
     HealthModule,
     PrismaModule,
     IngestionModule,
+    SignalsModule,
   ],
 })
 export class AppModule {}

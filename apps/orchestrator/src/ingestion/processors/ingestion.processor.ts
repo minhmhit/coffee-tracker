@@ -1,7 +1,8 @@
-import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
-import { Job } from 'bullmq';
+import { Processor, WorkerHost, OnWorkerEvent, InjectQueue } from '@nestjs/bullmq';
+import { Job, Queue } from 'bullmq';
 import { Logger } from '@nestjs/common';
 import { INGESTION_JOBS, INGESTION_QUEUE_NAME } from '../ingestion.constants';
+import { SIGNALS_JOBS, SIGNALS_QUEUE_NAME } from '../../signals/signals.constants';
 import { IngestionService } from '../ingestion.service';
 
 export interface IngestionJobPayload {
@@ -13,7 +14,11 @@ export interface IngestionJobPayload {
 export class IngestionProcessor extends WorkerHost {
   private readonly logger = new Logger(IngestionProcessor.name);
 
-  constructor(private readonly ingestionService: IngestionService) {
+  constructor(
+    private readonly ingestionService: IngestionService,
+    @InjectQueue(SIGNALS_QUEUE_NAME)
+    private readonly signalsQueue: Queue,
+  ) {
     super();
   }
 
@@ -51,6 +56,26 @@ export class IngestionProcessor extends WorkerHost {
     }
 
     const record = await this.ingestionService.upsertDailySnapshot(snapshot);
+
+    // 3. Automatically chain pipeline: trigger daily signals calculation
+    try {
+      this.logger.log(`Enqueuing signals computation job for date: ${snapshot.date}...`);
+      await this.signalsQueue.add(
+        SIGNALS_JOBS.COMPUTE_DAILY_SIGNALS,
+        {
+          targetDate: snapshot.date,
+          trigger: 'auto_chained_from_ingestion',
+        },
+        {
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 5000 },
+          removeOnComplete: 100,
+          removeOnFail: 500,
+        },
+      );
+    } catch (queueErr: any) {
+      this.logger.error(`Failed to enqueue signals job: ${queueErr.message}`, queueErr.stack);
+    }
 
     return {
       success: true,

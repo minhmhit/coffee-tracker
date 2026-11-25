@@ -5,6 +5,7 @@ import { IngestionProcessor } from '../processors/ingestion.processor';
 import { IngestionScheduler } from '../schedulers/ingestion.scheduler';
 import { IngestionService } from '../ingestion.service';
 import { INGESTION_CRONS, INGESTION_JOBS, INGESTION_QUEUE_NAME } from '../ingestion.constants';
+import { SIGNALS_JOBS, SIGNALS_QUEUE_NAME } from '../../signals/signals.constants';
 import { Prisma } from '@prisma/client';
 
 describe('IngestionProcessor & Scheduler Suite (Step 1.2 & 1.3)', () => {
@@ -12,6 +13,7 @@ describe('IngestionProcessor & Scheduler Suite (Step 1.2 & 1.3)', () => {
   let scheduler: IngestionScheduler;
   let ingestionService: jest.Mocked<Partial<IngestionService>>;
   let queueMock: jest.Mocked<Partial<Queue>>;
+  let signalsQueueMock: jest.Mocked<Partial<Queue>>;
 
   const mockSnapshot = {
     date: '2026-11-22',
@@ -71,6 +73,10 @@ describe('IngestionProcessor & Scheduler Suite (Step 1.2 & 1.3)', () => {
       getJobSchedulersCount: jest.fn().mockResolvedValue(3),
     };
 
+    signalsQueueMock = {
+      add: jest.fn().mockResolvedValue({ id: 'sig-job-1' } as any),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         IngestionProcessor,
@@ -83,6 +89,10 @@ describe('IngestionProcessor & Scheduler Suite (Step 1.2 & 1.3)', () => {
           provide: getQueueToken(INGESTION_QUEUE_NAME),
           useValue: queueMock,
         },
+        {
+          provide: getQueueToken(SIGNALS_QUEUE_NAME),
+          useValue: signalsQueueMock,
+        },
       ],
     }).compile();
 
@@ -91,7 +101,7 @@ describe('IngestionProcessor & Scheduler Suite (Step 1.2 & 1.3)', () => {
   });
 
   describe('1. IngestionProcessor', () => {
-    it('should successfully process a valid daily ingestion job and perform idempotent upsert', async () => {
+    it('should successfully process a valid daily ingestion job, perform idempotent upsert, and chain signals-queue', async () => {
       ingestionService.fetchDailySnapshot!.mockResolvedValue({
         snapshot: mockSnapshot,
         sanityResult: { valid: true, reasons: [] },
@@ -114,6 +124,16 @@ describe('IngestionProcessor & Scheduler Suite (Step 1.2 & 1.3)', () => {
       expect(result.daklak).toBe('71800');
       expect(ingestionService.fetchDailySnapshot).toHaveBeenCalledTimes(1);
       expect(ingestionService.upsertDailySnapshot).toHaveBeenCalledWith(mockSnapshot);
+
+      // Verify automatic pipeline chaining
+      expect(signalsQueueMock.add).toHaveBeenCalledWith(
+        SIGNALS_JOBS.COMPUTE_DAILY_SIGNALS,
+        expect.objectContaining({
+          targetDate: '2026-11-22',
+          trigger: 'auto_chained_from_ingestion',
+        }),
+        expect.any(Object),
+      );
     });
 
     it('should successfully process monthly climate sync job', async () => {
@@ -162,6 +182,7 @@ describe('IngestionProcessor & Scheduler Suite (Step 1.2 & 1.3)', () => {
         /Ingestion sanity validation failed/,
       );
       expect(ingestionService.upsertDailySnapshot).not.toHaveBeenCalled();
+      expect(signalsQueueMock.add).not.toHaveBeenCalled();
     });
 
     it('should log warning and handle onJobFailed without crashing', () => {

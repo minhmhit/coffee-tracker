@@ -11,12 +11,18 @@ import { IngestionService } from './ingestion.service';
 import { IngestionProcessor } from './processors/ingestion.processor';
 import { IngestionScheduler } from './schedulers/ingestion.scheduler';
 import { INGESTION_QUEUE_NAME } from './ingestion.constants';
+import { SIGNALS_QUEUE_NAME } from '../signals/signals.constants';
 
 @Module({
   imports: [
-    BullModule.registerQueue({
-      name: INGESTION_QUEUE_NAME,
-    }),
+    BullModule.registerQueue(
+      {
+        name: INGESTION_QUEUE_NAME,
+      },
+      {
+        name: SIGNALS_QUEUE_NAME,
+      },
+    ),
   ],
   providers: [
     DomesticCoffeeAdapter,
