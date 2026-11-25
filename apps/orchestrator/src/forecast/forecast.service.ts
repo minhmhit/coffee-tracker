@@ -255,10 +255,11 @@ export class ForecastService {
   }
 
   /**
-   * Returns the most recent successful forecast run with its full 26 predictions.
+   * Returns the most recent successful forecast run with its full 26 predictions
+   * and origin benchmark price.
    */
   async getLatestForecast() {
-    return this.prisma.forecastRun.findFirst({
+    const run = await this.prisma.forecastRun.findFirst({
       where: { status: 'SUCCESS' },
       orderBy: { forecast_date: 'desc' },
       include: {
@@ -267,5 +268,107 @@ export class ForecastService {
         },
       },
     });
+
+    if (!run) return null;
+
+    const originPriceRecord = await this.prisma.rawMarketPrice.findFirst({
+      where: { price_date: run.forecast_date },
+    });
+
+    return {
+      run_id: run.run_id,
+      forecast_date: run.forecast_date.toISOString().split('T')[0],
+      origin_price_daklak: originPriceRecord ? originPriceRecord.price_daklak.toNumber() : null,
+      status: run.status,
+      model_version: run.model_version,
+      created_at: run.created_at.toISOString(),
+      metrics: run.metrics,
+      blend_weights: run.blend_weights,
+      predictions: run.predictions.map((p) => ({
+        horizon_week: p.horizon_week,
+        target_date: p.target_date instanceof Date ? p.target_date.toISOString().split('T')[0] : String(p.target_date).split('T')[0],
+        pred_p10: p.pred_p10.toNumber(),
+        pred_p50: p.pred_p50.toNumber(),
+        pred_p90: p.pred_p90.toNumber(),
+        baseline_rw: p.baseline_rw ? p.baseline_rw.toNumber() : null,
+        baseline_futures: p.baseline_futures ? p.baseline_futures.toNumber() : null,
+      })),
+    };
+  }
+
+  /**
+   * Returns paginated list of forecast runs for audit trail.
+   */
+  async getForecastRuns(limit: number = 20, offset: number = 0) {
+    const [runs, total] = await Promise.all([
+      this.prisma.forecastRun.findMany({
+        orderBy: { created_at: 'desc' },
+        take: limit,
+        skip: offset,
+        include: {
+          _count: {
+            select: { predictions: true },
+          },
+        },
+      }),
+      this.prisma.forecastRun.count(),
+    ]);
+
+    return {
+      runs: runs.map((r) => ({
+        run_id: r.run_id,
+        forecast_date: r.forecast_date.toISOString().split('T')[0],
+        status: r.status,
+        model_version: r.model_version,
+        error_message: r.error_message,
+        metrics: r.metrics,
+        predictions_count: (r as any)._count?.predictions || 0,
+        created_at: r.created_at.toISOString(),
+      })),
+      total,
+      limit,
+      offset,
+    };
+  }
+
+  /**
+   * Returns a specific forecast run by UUID with all 26 predictions.
+   */
+  async getForecastRunById(runId: string) {
+    const run = await this.prisma.forecastRun.findUnique({
+      where: { run_id: runId },
+      include: {
+        predictions: {
+          orderBy: { horizon_week: 'asc' },
+        },
+      },
+    });
+
+    if (!run) return null;
+
+    const originPriceRecord = await this.prisma.rawMarketPrice.findFirst({
+      where: { price_date: run.forecast_date },
+    });
+
+    return {
+      run_id: run.run_id,
+      forecast_date: run.forecast_date.toISOString().split('T')[0],
+      origin_price_daklak: originPriceRecord ? originPriceRecord.price_daklak.toNumber() : null,
+      status: run.status,
+      model_version: run.model_version,
+      error_message: run.error_message,
+      created_at: run.created_at.toISOString(),
+      metrics: run.metrics,
+      blend_weights: run.blend_weights,
+      predictions: run.predictions.map((p) => ({
+        horizon_week: p.horizon_week,
+        target_date: p.target_date instanceof Date ? p.target_date.toISOString().split('T')[0] : String(p.target_date).split('T')[0],
+        pred_p10: p.pred_p10.toNumber(),
+        pred_p50: p.pred_p50.toNumber(),
+        pred_p90: p.pred_p90.toNumber(),
+        baseline_rw: p.baseline_rw ? p.baseline_rw.toNumber() : null,
+        baseline_futures: p.baseline_futures ? p.baseline_futures.toNumber() : null,
+      })),
+    };
   }
 }

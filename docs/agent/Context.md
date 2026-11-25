@@ -24,8 +24,8 @@
 ## 2. Current Progress Tracker `[AUTO-UPDATE]`
 
 - **Active Phase:** Phase 4 — Orchestration, Forecast Persistence & Frontend Dashboard
-- **Last Completed Step:** `STEP 4.1` (NestJS `forecast-queue` Worker & Forecast Run Persistence)
-- **Next Step to Execute:** `STEP 4.2` (REST API Endpoints for Dashboard)
+- **Last Completed Step:** `STEP 4.2` (REST API Endpoints for Dashboard)
+- **Next Step to Execute:** `STEP 4.3` (Next.js Dashboard & E2E Smoke Test)
 - **Overall Status:**
   - [x] Phase 0: Step 0.1 (Monorepo & Docker)
   - [x] Phase 0: Step 0.2 (DB Schema & Prisma)
@@ -39,7 +39,8 @@
   - [x] Phase 3: Step 3.3 (LightGBM Quantile - DONE)
   - [x] Phase 3: Step 3.4 (Walk-Forward Ensemble & Full FastAPI Integration - DONE)
   - [x] Phase 4: Step 4.1 (NestJS Forecast Worker - DONE)
-  - [ ] Phase 4: Step 4.2 (Dashboard REST APIs) | Step 4.3 (Next.js Dashboard & E2E Smoke Test)
+  - [x] Phase 4: Step 4.2 (Dashboard REST APIs - DONE)
+  - [ ] Phase 4: Step 4.3 (Next.js Dashboard & E2E Smoke Test)
 
 ---
 
@@ -105,8 +106,19 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
   - `econometric_forecast` (Leg 1: VECM rank >= 1, Ridge VAR fallback)
   - `lgbm_quantile_forecast` (Leg 2: Global Horizon-Conditioned LightGBM Quantile Regression)
   - `generate_ensemble_forecast` (Master Ensemble: 12-origin Walk-Forward CV blending)
-- **NestJS API Endpoints Active:** `GET /health` (Healthy)
-- **NestJS Modules Active:** `HealthModule`, `PrismaModule` (Global), `IngestionModule`, `SignalsModule`, `AlertsModule`
+- **NestJS API Endpoints Active:**
+  - `GET /health` (Healthy)
+  - `GET /api/market/latest` (4 provinces + London M1/M3/M6 + USD/VND + Brent + DoD/WoW)
+  - `GET /api/market/history` (Filtered time-series by ?days= or ?from=&to=)
+  - `GET /api/signals/latest` (Basis, Spread, Vol 30d, Z-Score, Regime, Anomaly flag)
+  - `GET /api/signals/history` (Historical signals time-series)
+  - `GET /api/forecast/latest` (Latest successful 26w forecast + origin price + metrics)
+  - `GET /api/forecast/runs` (Paginated forecast runs audit trail)
+  - `GET /api/forecast/runs/:runId` (Specific forecast run with 26 predictions)
+  - `POST /api/forecast/trigger` (Manual forecast trigger)
+  - `GET /api/climate/latest` (Latest monthly climate anomaly)
+  - `GET /api/climate/history` (Monthly climate history)
+- **NestJS Modules Active:** `HealthModule`, `PrismaModule` (Global), `IngestionModule`, `SignalsModule`, `AlertsModule`, `ForecastModule`
 
 ---
 

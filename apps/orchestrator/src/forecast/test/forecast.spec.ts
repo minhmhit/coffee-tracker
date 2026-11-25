@@ -2,10 +2,11 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getQueueToken } from '@nestjs/bullmq';
 import { Queue, Job } from 'bullmq';
 import { Prisma } from '@prisma/client';
+import { NotFoundException } from '@nestjs/common';
 import { ForecastService } from '../forecast.service';
 import { ForecastProcessor } from '../processors/forecast.processor';
 import { ForecastScheduler } from '../schedulers/forecast.scheduler';
-import { ForecastController } from '../forecast.controller';
+import { ForecastController, AdminForecastController } from '../forecast.controller';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   FORECAST_CRONS,
@@ -14,11 +15,12 @@ import {
 } from '../forecast.constants';
 import { ALERT_JOBS, ALERT_QUEUE_NAME } from '../../signals/signals.constants';
 
-describe('Forecast Module Suite (Step 4.1)', () => {
+describe('Forecast Module Suite (Step 4.1 & 4.2)', () => {
   let forecastService: ForecastService;
   let forecastProcessor: ForecastProcessor;
   let forecastScheduler: ForecastScheduler;
   let forecastController: ForecastController;
+  let adminForecastController: AdminForecastController;
 
   let prismaService: any;
   let forecastQueue: any;
@@ -33,6 +35,21 @@ describe('Forecast Module Suite (Step 4.1)', () => {
     baseline_naive: 74000,
     baseline_futures: 74500 + i * 50,
   }));
+
+  const baseDate = new Date('2026-11-29T00:00:00.000Z');
+  const mockDbPredictions = Array.from({ length: 26 }, (_, i) => {
+    const tDate = new Date(baseDate);
+    tDate.setDate(tDate.getDate() + i * 7);
+    return {
+      horizon_week: i + 1,
+      target_date: tDate,
+      pred_p10: new Prisma.Decimal(70000 + i * 100),
+      pred_p50: new Prisma.Decimal(75000 + i * 150),
+      pred_p90: new Prisma.Decimal(80000 + i * 200),
+      baseline_rw: new Prisma.Decimal(74000),
+      baseline_futures: new Prisma.Decimal(74500 + i * 50),
+    };
+  });
 
   const mockMlResponse = {
     run_id: 'test-run-uuid-1234',
@@ -52,6 +69,7 @@ describe('Forecast Module Suite (Step 4.1)', () => {
     prismaService = {
       rawMarketPrice: {
         findMany: jest.fn(),
+        findFirst: jest.fn(),
       },
       macroClimateMonthly: {
         findMany: jest.fn(),
@@ -60,6 +78,7 @@ describe('Forecast Module Suite (Step 4.1)', () => {
         create: jest.fn(),
         findFirst: jest.fn(),
         findUnique: jest.fn(),
+        findMany: jest.fn(),
         count: jest.fn(),
       },
       forecastPrediction: {
@@ -79,7 +98,7 @@ describe('Forecast Module Suite (Step 4.1)', () => {
     };
 
     const module: TestingModule = await Test.createTestingModule({
-      controllers: [ForecastController],
+      controllers: [ForecastController, AdminForecastController],
       providers: [
         ForecastService,
         ForecastProcessor,
@@ -103,6 +122,7 @@ describe('Forecast Module Suite (Step 4.1)', () => {
     forecastProcessor = module.get<ForecastProcessor>(ForecastProcessor);
     forecastScheduler = module.get<ForecastScheduler>(ForecastScheduler);
     forecastController = module.get<ForecastController>(ForecastController);
+    adminForecastController = module.get<AdminForecastController>(AdminForecastController);
   });
 
   afterEach(() => {
@@ -325,7 +345,7 @@ describe('Forecast Module Suite (Step 4.1)', () => {
     });
   });
 
-  describe('5. ForecastScheduler & Controller', () => {
+  describe('5. ForecastScheduler & Controller Suite (Step 4.2)', () => {
     it('should register weekly Monday 02:00 AM repeatable job in BullMQ', async () => {
       await forecastScheduler.onModuleInit();
 
@@ -348,23 +368,94 @@ describe('Forecast Module Suite (Step 4.1)', () => {
       expect(forecastQueue.add).toHaveBeenCalled();
     });
 
-    it('ForecastController.getLatestForecast should return latest run when present', async () => {
+    it('ForecastController.getLatestForecast should return formatted forecast payload with numeric predictions', async () => {
       prismaService.forecastRun.findFirst.mockResolvedValue({
         run_id: 'run-999',
+        forecast_date: new Date('2026-11-22T00:00:00.000Z'),
         status: 'SUCCESS',
-        predictions: mockPredictions,
+        model_version: 'two_legged_walk_forward_v1',
+        created_at: new Date('2026-11-25T00:00:00.000Z'),
+        metrics: { pinball_loss: 0.0083 },
+        blend_weights: { short: 0.6 },
+        predictions: mockDbPredictions,
+      });
+
+      prismaService.rawMarketPrice.findFirst.mockResolvedValue({
+        price_daklak: new Prisma.Decimal(71800),
       });
 
       const res = await forecastController.getLatestForecast();
-      expect(res.found).toBe(true);
-      expect((res as any).data.run_id).toBe('run-999');
+      expect(res.run_id).toBe('run-999');
+      expect(res.origin_price_daklak).toBe(71800);
+      expect(res.predictions.length).toBe(26);
+      expect(res.predictions[0].pred_p50).toBe(75000);
+      expect(typeof res.predictions[0].pred_p50).toBe('number');
     });
 
-    it('ForecastController.getLatestForecast should return found: false when empty', async () => {
+    it('ForecastController.getLatestForecast should throw NotFoundException when empty', async () => {
       prismaService.forecastRun.findFirst.mockResolvedValue(null);
 
-      const res = await forecastController.getLatestForecast();
-      expect(res.found).toBe(false);
+      await expect(forecastController.getLatestForecast()).rejects.toThrow(NotFoundException);
+    });
+
+    it('ForecastController.getForecastRuns should return paginated runs list', async () => {
+      prismaService.forecastRun.findMany.mockResolvedValue([
+        {
+          run_id: 'run-999',
+          forecast_date: new Date('2026-11-22T00:00:00.000Z'),
+          status: 'SUCCESS',
+          model_version: 'v1',
+          error_message: null,
+          metrics: {},
+          created_at: new Date('2026-11-25T00:00:00.000Z'),
+          _count: { predictions: 26 },
+        },
+      ]);
+      prismaService.forecastRun.count.mockResolvedValue(1);
+
+      const res = await forecastController.getForecastRuns('10', '0');
+      expect(res.total).toBe(1);
+      expect(res.runs.length).toBe(1);
+      expect(res.runs[0].predictions_count).toBe(26);
+    });
+
+    it('ForecastController.getForecastRunById should return run details by ID', async () => {
+      prismaService.forecastRun.findUnique.mockResolvedValue({
+        run_id: 'run-999',
+        forecast_date: new Date('2026-11-22T00:00:00.000Z'),
+        status: 'SUCCESS',
+        model_version: 'v1',
+        error_message: null,
+        created_at: new Date('2026-11-25T00:00:00.000Z'),
+        metrics: {},
+        blend_weights: {},
+        predictions: mockDbPredictions,
+      });
+
+      prismaService.rawMarketPrice.findFirst.mockResolvedValue({
+        price_daklak: new Prisma.Decimal(71800),
+      });
+
+      const res = await forecastController.getForecastRunById('run-999');
+      expect(res.run_id).toBe('run-999');
+      expect(res.predictions.length).toBe(26);
+    });
+
+    it('ForecastController.getForecastRunById should throw NotFoundException if run not found', async () => {
+      prismaService.forecastRun.findUnique.mockResolvedValue(null);
+
+      await expect(forecastController.getForecastRunById('non-existent')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('AdminForecastController should support admin routes', async () => {
+      prismaService.forecastRun.findFirst.mockResolvedValue(null);
+      const latestRes = await adminForecastController.getLatestForecast();
+      expect(latestRes.found).toBe(false);
+
+      const triggerRes = await adminForecastController.triggerForecast();
+      expect(triggerRes.success).toBe(true);
     });
   });
 });

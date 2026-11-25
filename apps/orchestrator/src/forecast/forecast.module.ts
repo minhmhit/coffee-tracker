@@ -4,7 +4,7 @@ import { FORECAST_QUEUE_NAME, FORECAST_WORKER_CONFIG } from './forecast.constant
 import { ForecastService } from './forecast.service';
 import { ForecastProcessor } from './processors/forecast.processor';
 import { ForecastScheduler } from './schedulers/forecast.scheduler';
-import { ForecastController } from './forecast.controller';
+import { ForecastController, AdminForecastController } from './forecast.controller';
 import { PrismaModule } from '../prisma/prisma.module';
 import { AlertsModule } from '../alerts/alerts.module';
 
@@ -20,7 +20,7 @@ import { AlertsModule } from '../alerts/alerts.module';
       },
     }),
   ],
-  controllers: [ForecastController],
+  controllers: [ForecastController, AdminForecastController],
   providers: [ForecastService, ForecastProcessor, ForecastScheduler],
   exports: [ForecastService, ForecastScheduler, BullModule],
 })
