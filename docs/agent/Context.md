@@ -95,7 +95,7 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
     2. `night_london_close_0100` (`0 1 * * *` Asia/Ho_Chi_Minh)
     3. `monthly_climate_05_0300` (`0 3 5 * *` Asia/Ho_Chi_Minh)
   - `signals-queue`: Chained tự động sau ingestion job.
-  - `alert-queue`: Repeatable scheduler `morning_briefing_0845` (`45 8 * * *` Asia/Ho_Chi_Minh) + nhận job Anomaly Alert & System Error.
+  - `alert-queue`: Repeatable scheduler `morning_briefing_0600` (`0 6 * * *` Asia/Ho_Chi_Minh) gửi điểm tin 6h sáng hàng ngày + nhận job Anomaly Alert & System Error.
   - `forecast-queue`: Repeatable scheduler `weekly_forecast_monday_0200` (`0 2 * * 1` Asia/Ho_Chi_Minh).
 - **FastAPI Endpoints Active:**
   - `GET /health` (Healthy)
@@ -116,6 +116,8 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
   - `GET /api/forecast/runs` (Paginated forecast runs audit trail)
   - `GET /api/forecast/runs/:runId` (Specific forecast run with 26 predictions)
   - `POST /api/forecast/trigger` (Manual forecast trigger)
+  - `POST /api/alerts/briefing/trigger` (Manual 06:00 AM briefing trigger to Telegram)
+  - `GET /api/alerts/status` (Telegram alerting config and 06:00 AM cron schedule status)
   - `GET /api/climate/latest` (Latest monthly climate anomaly)
   - `GET /api/climate/history` (Monthly climate history)
 - **NextJS Frontend Active:**

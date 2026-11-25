@@ -344,18 +344,18 @@ describe('Alerts Module Suite (Step 2.2)', () => {
       scheduler = module.get<AlertScheduler>(AlertScheduler);
     });
 
-    it('should register morning briefing 08:45 AM repeatable job on module init', async () => {
+    it('should register morning briefing 06:00 AM repeatable job on module init', async () => {
       await scheduler.onModuleInit();
 
       expect(queueMock.upsertJobScheduler).toHaveBeenCalledWith(
-        'morning_briefing_0845',
+        'morning_briefing_0600',
         {
-          pattern: ALERT_CRONS.MORNING_BRIEFING,
+          pattern: ALERT_CRONS.MORNING_BRIEFING_0600,
           tz: ALERT_CRONS.TIMEZONE,
         },
         expect.objectContaining({
           name: ALERT_JOBS.MORNING_BRIEFING,
-          data: { trigger: 'cron_morning_briefing_0845' },
+          data: { trigger: 'cron_morning_briefing_0600', slot: '0600' },
         }),
       );
     });

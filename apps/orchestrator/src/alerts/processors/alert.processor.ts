@@ -59,10 +59,12 @@ export class AlertProcessor extends WorkerHost {
     const prev = recentPrices.length > 1 ? recentPrices[1] : null;
 
     const dateStr = latest.price_date.toISOString().split('T')[0];
+    const slot = job.data?.slot || '0600';
+    const briefingKey = `${dateStr}_${slot}`;
 
     // Deduplication guard
-    if (this.sentBriefings.has(dateStr) && !job.data?.force) {
-      this.logger.log(`Morning briefing for ${dateStr} already sent. Skipping duplicate.`);
+    if (this.sentBriefings.has(briefingKey) && !job.data?.force) {
+      this.logger.log(`Morning briefing for ${briefingKey} already sent. Skipping duplicate.`);
       return { skipped: true, duplicate: true };
     }
 
@@ -132,7 +134,7 @@ export class AlertProcessor extends WorkerHost {
 
     const result = await this.telegramService.sendMessage(messageHtml);
     if (result.success) {
-      this.sentBriefings.add(dateStr);
+      this.sentBriefings.add(briefingKey);
     }
 
     return result;
