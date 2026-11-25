@@ -23,9 +23,9 @@
 
 ## 2. Current Progress Tracker `[AUTO-UPDATE]`
 
-- **Active Phase:** Phase 6 — Editorial UI Integration (Stitch), SEO Optimization & Free-Tier Deployment Plan
-- **Last Completed Step:** `STEP 6.4` (Free-Tier Cloud Deployment Feasibility Research & `deploy_plan.md`)
-- **Next Step to Execute:** `STEP 6.5` (Telegram `@BotFather` Configuration Guide & Interactive Command Verification)
+- **Active Phase:** Phase 6 — Editorial UI Integration (Stitch), SEO Optimization & Deployment Readiness (`ALL PHASES COMPLETE`)
+- **Last Completed Step:** `STEP 6.5` (Telegram Bot `@BotFather` Guide, `setMyCommands` Auto-Sync & Interactive Verification)
+- **Next Step to Execute:** `NONE — ALL PHASES (0–6) COMPLETE`
 - **Overall Status:**
   - [x] Phase 0: Step 0.1 (Monorepo & Docker - DONE)
   - [x] Phase 0: Step 0.2 (DB Schema & Prisma - DONE)
@@ -49,7 +49,7 @@
   - [x] Phase 6: Step 6.2 (Technical SEO, OpenGraph & Core Web Vitals - DONE)
   - [x] Phase 6: Step 6.3 (Production Dockerfile & Docker Compose Integration for `apps/web` - DONE)
   - [x] Phase 6: Step 6.4 (Free-Tier Cloud Deployment Research & `deploy_plan.md` - DONE)
-  - [ ] Phase 6: Step 6.5 (Telegram `@BotFather` Setup Guide & Interactive Verification)
+  - [x] Phase 6: Step 6.5 (Telegram `@BotFather` Setup Guide & Interactive Verification - DONE)
 
 ---
 
@@ -105,11 +105,11 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
   - `raw_market_prices`: **3,248 continuous records** (2018-01-01 to 2026-11-22).
   - `macro_climate_monthly`: **107 continuous monthly records** (2018-01-01 to 2026-11-01).
   - `daily_signals`: **3,248 continuous records** (2018-01-01 to 2026-11-22). Columns: `signal_date`, `basis`, `spread`, `volatility_30d`, `z_score`, `is_anomaly`, `regime`, `notes`, timestamps.
-  - `forecast_runs`: **3 records** (`SUCCESS` forecasts stored in PostgreSQL).
-  - `forecast_predictions`: **26 records** ($h = 1..26$, $P_{10}, P_{50}, P_{90}$, Naive RW, Futures baseline).
+  - `forecast_runs`: **4 records** (`SUCCESS` forecasts stored in PostgreSQL).
+  - `forecast_predictions`: **26 records** per run ($h = 1..26$, $P_{10}, P_{50}, P_{90}$, Naive RW, Futures baseline).
   - `daily_weather`: **4 records** for `2026-11-25` (`DAKLAK`, `LAMDONG`, `GIALAI`, `DAKNONG`).
   - `ice_robusta_stocks`: **1 record** (`2026-11-24`, `5,791` lots / `57,910` tonnes via `vietnambiz.vn` fallback).
-  - `telegram_subscribers`: **0 records** (Target for Step 5.3 onboarding).
+  - `telegram_subscribers`: **2 records** verified live (`7583239264` `is_active=true`, `-5371622980` `is_active=false`).
 - **BullMQ Queues Active:**
   - `ingestion-queue`: 4 repeatable schedulers:
     1. `morning_domestic_0830` (`30 8 * * *` Asia/Ho_Chi_Minh)
@@ -192,3 +192,4 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
 | `STEP 6.2` | 2026-11-25 | SEO Metadata, dynamic `robots.ts`/`sitemap.ts`/`opengraph-image.tsx`, JSON-LD, SSR hydration (CLS=0), Lighthouse 100 SEO/A11y/BP PASS | [step_6_2_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_6_2_report.md) |
 | `STEP 6.3` | 2026-11-25 | Next.js standalone Dockerfile (`node:20-alpine` runner, 282MB), `coffee_tracker_web` in Compose, 5/5 containers Healthy PASS | [step_6_3_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_6_3_report.md) |
 | `STEP 6.4` | 2026-11-25 | 5-container resource benchmark (idle 409MiB, ML peak 171.7MiB/554% CPU), no-card $0 architecture blueprint in `deploy_plan.md` | [step_6_4_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_6_4_report.md) |
+| `STEP 6.5` | 2026-11-25 | Telegram `setMyCommands` auto-sync, `docs/telegram_bot_setup.md` guide, live `/start`/`/today`/`/stop` & DB verified, 11/11 Jest suites PASS | [step_6_5_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_6_5_report.md) |

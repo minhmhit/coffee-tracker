@@ -1,11 +1,26 @@
-import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { TelegramService } from './telegram.service';
+import { TelegramBotCommand, TelegramService } from './telegram.service';
 import { MorningBriefingService } from './morning-briefing.service';
 import { AlertFormatter } from './alert-formatter';
 
+export const DEFAULT_TELEGRAM_COMMANDS: TelegramBotCommand[] = [
+  {
+    command: 'start',
+    description: 'Đăng ký nhận điểm tin giá cà phê & thời tiết 06:00 mỗi sáng',
+  },
+  {
+    command: 'today',
+    description: 'Xem ngay giá cà phê, thời tiết & nhận định hôm nay',
+  },
+  {
+    command: 'stop',
+    description: 'Tạm dừng nhận bản tin tự động buổi sáng',
+  },
+];
+
 @Injectable()
-export class TelegramBotService implements OnModuleDestroy {
+export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(TelegramBotService.name);
   private pollingAbortController: AbortController | null = null;
   private isPolling = false;
@@ -17,8 +32,33 @@ export class TelegramBotService implements OnModuleDestroy {
     private readonly briefingService: MorningBriefingService,
   ) {}
 
+  onModuleInit() {
+    if (
+      process.env.NODE_ENV === 'test' ||
+      process.env.TELEGRAM_POLLING_ENABLED === 'false' ||
+      !this.telegramService.isConfigured()
+    ) {
+      return;
+    }
+
+    // Synchronize clickable Telegram command menu non-blockingly at startup
+    void this.syncBotCommands();
+  }
+
   onModuleDestroy() {
     this.stopPolling();
+  }
+
+  /**
+   * Registers /start, /today, /stop command hints in Telegram clients via setMyCommands.
+   */
+  async syncBotCommands(): Promise<{ success: boolean; error?: string }> {
+    try {
+      return await this.telegramService.setMyCommands(DEFAULT_TELEGRAM_COMMANDS);
+    } catch (err: any) {
+      this.logger.warn(`Failed to sync Telegram commands cleanly: ${err.message}`);
+      return { success: false, error: err.message };
+    }
   }
 
   /**
