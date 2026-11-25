@@ -24,8 +24,8 @@
 ## 2. Current Progress Tracker `[AUTO-UPDATE]`
 
 - **Active Phase:** Phase 4 — Orchestration, Forecast Persistence & Frontend Dashboard
-- **Last Completed Step:** `STEP 3.4` (Expanding-Window Walk-Forward Ensemble & Full FastAPI Integration)
-- **Next Step to Execute:** `STEP 4.1` (NestJS `forecast-queue` Worker & Forecast Run Persistence)
+- **Last Completed Step:** `STEP 4.1` (NestJS `forecast-queue` Worker & Forecast Run Persistence)
+- **Next Step to Execute:** `STEP 4.2` (REST API Endpoints for Dashboard)
 - **Overall Status:**
   - [x] Phase 0: Step 0.1 (Monorepo & Docker)
   - [x] Phase 0: Step 0.2 (DB Schema & Prisma)
@@ -38,7 +38,8 @@
   - [x] Phase 3: Step 3.2 (VECM/BVAR & Baselines - DONE)
   - [x] Phase 3: Step 3.3 (LightGBM Quantile - DONE)
   - [x] Phase 3: Step 3.4 (Walk-Forward Ensemble & Full FastAPI Integration - DONE)
-  - [ ] Phase 4: Step 4.1 (NestJS Forecast Worker) | Step 4.2 (Dashboard REST APIs) | Step 4.3 (Next.js Dashboard & E2E Smoke Test)
+  - [x] Phase 4: Step 4.1 (NestJS Forecast Worker - DONE)
+  - [ ] Phase 4: Step 4.2 (Dashboard REST APIs) | Step 4.3 (Next.js Dashboard & E2E Smoke Test)
 
 ---
 
@@ -85,8 +86,8 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
   - `raw_market_prices`: **3,248 continuous records** (2018-01-01 to 2026-11-22).
   - `macro_climate_monthly`: **107 continuous monthly records** (2018-01-01 to 2026-11-01).
   - `daily_signals`: **3,248 continuous records** (2018-01-01 to 2026-11-22). Columns: `signal_date`, `basis`, `spread`, `volatility_30d`, `z_score`, `is_anomaly`, `regime`, `notes`, timestamps.
-  - `forecast_runs`: 0 records (Target for Phase 4.1).
-  - `forecast_predictions`: 0 records (Target for Phase 4.1).
+  - `forecast_runs`: **1 record** (`b10e0d43-d324-4253-b76a-472333f4af25`, status: `SUCCESS`).
+  - `forecast_predictions`: **26 records** ($h = 1..26$, $P_{10}, P_{50}, P_{90}$, Naive RW, Futures baseline).
 - **BullMQ Queues Active:**
   - `ingestion-queue`: 3 repeatable schedulers:
     1. `morning_domestic_0830` (`30 8 * * *` Asia/Ho_Chi_Minh)
@@ -94,6 +95,7 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
     3. `monthly_climate_05_0300` (`0 3 5 * *` Asia/Ho_Chi_Minh)
   - `signals-queue`: Chained tự động sau ingestion job.
   - `alert-queue`: Repeatable scheduler `morning_briefing_0845` (`45 8 * * *` Asia/Ho_Chi_Minh) + nhận job Anomaly Alert & System Error.
+  - `forecast-queue`: Repeatable scheduler `weekly_forecast_monday_0200` (`0 2 * * 1` Asia/Ho_Chi_Minh).
 - **FastAPI Endpoints Active:**
   - `GET /health` (Healthy)
   - `POST /api/v1/forecast/weekly` (Production Ready: Two-Legged Walk-Forward Ensemble, 26-week P10/P50/P90, Naive & Futures baselines, out-of-sample MAPE metrics)

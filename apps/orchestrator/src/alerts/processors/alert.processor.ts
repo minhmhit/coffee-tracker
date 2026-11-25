@@ -79,6 +79,44 @@ export class AlertProcessor extends WorkerHost {
     const londonM6 = latest.london_m6 ? latest.london_m6.toNumber() : null;
     const spread = signal?.spread ? signal.spread.toNumber() : (londonM1 && londonM6 ? londonM1 - londonM6 : null);
 
+    // 3. Fetch latest successful forecast run if available
+    let forecastSummary: string | undefined;
+    try {
+      const latestForecast = this.prisma.forecastRun
+        ? await this.prisma.forecastRun.findFirst({
+            where: { status: 'SUCCESS' },
+            orderBy: { forecast_date: 'desc' },
+            include: {
+              predictions: {
+                orderBy: { horizon_week: 'asc' },
+              },
+            },
+          })
+        : null;
+
+      if (latestForecast && latestForecast.predictions && latestForecast.predictions.length > 0) {
+        const p4 = latestForecast.predictions.find((p) => p.horizon_week === 4);
+        const p12 = latestForecast.predictions.find((p) => p.horizon_week === 12);
+        const p26 = latestForecast.predictions.find((p) => p.horizon_week === 26);
+
+        const items: string[] = [];
+        if (p4) {
+          items.push(`\n  • 1 Tháng (T+4): <b>${Math.round(p4.pred_p50.toNumber()).toLocaleString('vi-VN')}</b> đ/kg (P10-P90: ${Math.round(p4.pred_p10.toNumber()).toLocaleString('vi-VN')} - ${Math.round(p4.pred_p90.toNumber()).toLocaleString('vi-VN')})`);
+        }
+        if (p12) {
+          items.push(`\n  • 3 Tháng (T+12): <b>${Math.round(p12.pred_p50.toNumber()).toLocaleString('vi-VN')}</b> đ/kg (P10-P90: ${Math.round(p12.pred_p10.toNumber()).toLocaleString('vi-VN')} - ${Math.round(p12.pred_p90.toNumber()).toLocaleString('vi-VN')})`);
+        }
+        if (p26) {
+          items.push(`\n  • 6 Tháng (T+26): <b>${Math.round(p26.pred_p50.toNumber()).toLocaleString('vi-VN')}</b> đ/kg (P10-P90: ${Math.round(p26.pred_p10.toNumber()).toLocaleString('vi-VN')} - ${Math.round(p26.pred_p90.toNumber()).toLocaleString('vi-VN')})`);
+        }
+        if (items.length > 0) {
+          forecastSummary = items.join('');
+        }
+      }
+    } catch (fErr: any) {
+      this.logger.warn(`Could not load latest forecast for morning briefing: ${fErr.message}`);
+    }
+
     const messageHtml = AlertFormatter.formatMorningBriefing({
       date: dateStr,
       daklakPrice: daklak,
@@ -89,7 +127,7 @@ export class AlertProcessor extends WorkerHost {
       basisVndKg: signal?.basis ? signal.basis.toNumber() : 0,
       regime: signal?.regime || 'NORMAL',
       volatility30d: signal?.volatility_30d ? signal.volatility_30d.toNumber() : null,
-      forecastSummary: '<i>Chưa khởi chạy mô hình 6T (Sẵn sàng trong Phase 3)</i>',
+      forecastSummary,
     });
 
     const result = await this.telegramService.sendMessage(messageHtml);
