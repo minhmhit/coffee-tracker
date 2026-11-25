@@ -24,8 +24,8 @@
 ## 2. Current Progress Tracker `[AUTO-UPDATE]`
 
 - **Active Phase:** Phase 5 — Live Weather, Explainable Insights, Telegram Onboarding & UX Redesign
-- **Last Completed Step:** `STEP 5.1` (Live Daily Weather, ICE Certified Robusta Stocks & Schema Extension)
-- **Next Step to Execute:** `STEP 5.2` (Explainable Market Insights Engine)
+- **Last Completed Step:** `STEP 5.2` (Explainable Market Insights Engine)
+- **Next Step to Execute:** `STEP 5.3` (Telegram Bot Self-Service Onboarding & Enriched Morning Briefing)
 - **Overall Status:**
   - [x] Phase 0: Step 0.1 (Monorepo & Docker - DONE)
   - [x] Phase 0: Step 0.2 (DB Schema & Prisma - DONE)
@@ -42,7 +42,8 @@
   - [x] Phase 4: Step 4.2 (Dashboard REST APIs - DONE)
   - [x] Phase 4: Step 4.3 (Next.js Dashboard & E2E Smoke Test - DONE)
   - [x] Phase 5: Step 5.1 (Live Weather, ICE Robusta Stocks & Schema Extension - DONE)
-  - [ ] Phase 5: Step 5.2 (Explainable Insights) | Step 5.3 (Telegram Self-Service & Enriched Briefing) | Step 5.4 (UX Redesign & E2E Smoke Test)
+  - [x] Phase 5: Step 5.2 (Explainable Insights - DONE)
+  - [ ] Phase 5: Step 5.3 (Telegram Self-Service & Enriched Briefing) | Step 5.4 (UX Redesign & E2E Smoke Test)
 
 ---
 
@@ -77,6 +78,7 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
 - **Walk-Forward CV Settings:** 12 rolling origins, step 4w, 1-year out-of-sample audit (Confirmed in Step 3.4)
 - **Daily Weather Scope & Provider:** Option A — all 4 Central Highlands provinces (`DAKLAK`, `LAMDONG`, `GIALAI`, `DAKNONG`) via Open-Meteo Forecast API (`https://api.open-meteo.com/v1/forecast`), updated at `05:45` (`45 5 * * *` VN) + paired with `08:30` & `01:00` ingestion (Confirmed in Step 5.1)
 - **ICE Certified Robusta Stocks Source & Sanity:** Primary `https://www.ice.com/report/173` (returns SPA/click-through gate) -> Fallback `vietnambiz.vn` coffee market articles (`5.791 lô` verified live) -> Stale carry-forward with `is_stale = true`; bounds `[500, 50000]` lots, `1 lot = 10 tonnes`, `<= ±25%` DoD delta (Confirmed in Step 5.1)
+- **Market Insights Engine:** 100% deterministic quantitative rules + Vietnamese templates citing exact DB figures (<35ms latency); initial ICE stocks history (<7 days) uses latest lot count + Spread/Regime until 7d/30d history accumulates (Confirmed in Step 5.2)
 - **Coffee Inventory Data Strategy:** Ingest real ICE Certified Robusta Stocks (`ice_robusta_stocks`, 1 lot = 10 tonnes) from external source (Primary: ICE Report Center `https://www.ice.com/report/173`; Fallback: `vietnambiz.vn` daily market report / stale-flag retention), combined with Calendar Spread (M1-M6) & Regime in `InsightsModule` (Confirmed for Phase 5)
 ---
 
@@ -132,9 +134,10 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
   - `GET /api/weather/history` (Historical daily weather ?days=7&province=DAKLAK)
   - `GET /api/stocks/robusta/latest` (ICE Certified Robusta stocks lots/tonnes + 7d/30d change)
   - `GET /api/stocks/robusta/history` (Historical ICE Certified Robusta stocks ?days=90)
+  - `GET /api/insights/latest` (Explainable insights for Oil, ICE Stocks/Supply, FX, Weather/Climate + Forecast transparency)
 - **NextJS Frontend Active:**
   - `http://localhost:3000` (Next.js 15 App Router Dashboard, Pure SVG Probabilistic Fan Chart, KPI Cards, Signals Table, Audit Trail)
-- **NestJS Modules Active:** `HealthModule`, `PrismaModule` (Global), `IngestionModule`, `SignalsModule`, `AlertsModule`, `ForecastModule`
+- **NestJS Modules Active:** `HealthModule`, `PrismaModule` (Global), `IngestionModule`, `SignalsModule`, `AlertsModule`, `ForecastModule`, `InsightsModule`
 
 ---
 
@@ -169,3 +172,4 @@ _(Must be filled via User answers during Ambiguity Checks — NEVER guessed by A
 | `STEP 4.2` | 2026-11-25 | Dashboard REST APIs (/market, /signals, /forecast, /climate), CORS enabled, 8/8 Jest suites PASS | [step_4_2_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_4_2_report.md) |
 | `STEP 4.3` | 2026-11-25 | Next.js 15 Dashboard UI + Pure SVG Fan Chart + E2E Smoke Test across all services PASS | [step_4_3_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_4_3_report.md) |
 | `STEP 5.1` | 2026-11-25 | 3 new Prisma tables, WeatherAdapter (4 provinces), IceStocksAdapter + sanity validator, 9/9 Jest suites (83 tests) PASS | [step_5_1_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_5_1_report.md) |
+| `STEP 5.2` | 2026-11-25 | InsightsModule (Oil, ICE Stocks/Supply, FX, Weather/Climate, Forecast Transparency), 10/10 Jest suites (89 tests) PASS, <35ms live | [step_5_2_report.md](file:///F:/coffee_tracker/docs/agent/Reports/step_5_2_report.md) |
