@@ -12,19 +12,30 @@ import {
   TelegramOnboardingInfo,
 } from '../types';
 
-const API_BASE =
-  typeof window === 'undefined'
-    ? process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
-    : process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const isServer = typeof window === 'undefined';
+
+const API_BASE = isServer
+  ? process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+  : process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 async function safeFetch<T>(endpoint: string, fallback: T): Promise<T> {
   try {
-    const res = await fetch(`${API_BASE}${endpoint}`, {
-      cache: 'no-store',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
+    const fetchOptions: RequestInit & { next?: { revalidate?: number } } = isServer
+      ? {
+          next: { revalidate: 300 },
+          signal: AbortSignal.timeout(3500),
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      : {
+          cache: 'no-store',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        };
+
+    const res = await fetch(`${API_BASE}${endpoint}`, fetchOptions);
     if (!res.ok) {
       console.warn(`API fetch error [${endpoint}]: HTTP ${res.status}`);
       return fallback;
@@ -85,13 +96,39 @@ export async function fetchTelegramInfo(): Promise<TelegramOnboardingInfo | null
   return safeFetch<TelegramOnboardingInfo | null>('/api/alerts/telegram-info', null);
 }
 
-export async function triggerForecastJob(): Promise<{ success: boolean; message: string; jobId?: string }> {
+export async function triggerForecastJob(
+  adminKey?: string,
+): Promise<{ success: boolean; status?: number; message: string; jobId?: string }> {
   try {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (adminKey?.trim()) {
+      headers['X-Admin-Key'] = adminKey.trim();
+    }
+
     const res = await fetch(`${API_BASE}/api/forecast/trigger`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
     });
-    return await res.json();
+
+    if (res.status === 401 || res.status === 403) {
+      return {
+        success: false,
+        status: res.status,
+        message: 'Cần nhập mã X-Admin-Key hợp lệ để kích hoạt dự báo.',
+      };
+    }
+
+    const data = await res.json();
+    if (!res.ok) {
+      return {
+        success: false,
+        status: res.status,
+        message: data?.message || `HTTP ${res.status}`,
+      };
+    }
+    return data;
   } catch (err: any) {
     return { success: false, message: err.message };
   }

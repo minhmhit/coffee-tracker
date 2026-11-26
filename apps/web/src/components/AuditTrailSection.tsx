@@ -17,22 +17,32 @@ export const AuditTrailSection: React.FC<AuditTrailSectionProps> = ({
   onRefresh,
 }) => {
   const [isTriggering, setIsTriggering] = useState(false);
+  const [showAdminPrompt, setShowAdminPrompt] = useState(false);
+  const [adminKeyInput, setAdminKeyInput] = useState('');
   const [triggerMessage, setTriggerMessage] = useState<string | null>(null);
   const metrics = latestForecast?.metrics;
 
   const handleManualForecast = async () => {
+    if (!showAdminPrompt) {
+      setShowAdminPrompt(true);
+      setTriggerMessage(null);
+      return;
+    }
+
     setIsTriggering(true);
     setTriggerMessage(null);
     try {
-      const result = await triggerForecastJob();
+      const result = await triggerForecastJob(adminKeyInput);
       if (result.success) {
-        setTriggerMessage('Đã gửi yêu cầu tính toán dự báo mới (đang xử lý nền).');
+        setTriggerMessage('Đã gửi yêu cầu tính toán dự báo mới thành công.');
+        setShowAdminPrompt(false);
+        setAdminKeyInput('');
         setTimeout(() => {
           setTriggerMessage(null);
           if (onRefresh) onRefresh();
         }, 5000);
       } else {
-        setTriggerMessage(`Không thể kích hoạt: ${result.message}`);
+        setTriggerMessage(result.message || 'Không thể kích hoạt dự báo.');
       }
     } catch (err: any) {
       setTriggerMessage(`Lỗi: ${err.message}`);
@@ -174,19 +184,67 @@ export const AuditTrailSection: React.FC<AuditTrailSectionProps> = ({
       </div>
 
       {/* Relocated Subtle Secondary Forecast Trigger (Hard Override 1) */}
-      <div className="pt-3 border-t border-[#E5E7EB] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-[14px] text-[#52525B]">
-        <span>
-          {triggerMessage || 'Hệ thống tự động cập nhật dự báo định kỳ vào sáng Thứ Hai hằng tuần.'}
-        </span>
-        <button
-          type="button"
-          onClick={handleManualForecast}
-          disabled={isTriggering}
-          className="inline-flex items-center gap-1.5 text-[#166534] font-semibold hover:underline disabled:opacity-60 self-start sm:self-auto"
-        >
-          <RefreshCw className={`w-4 h-4 ${isTriggering ? 'animate-spin' : ''}`} />
-          <span>{isTriggering ? 'Đang kích hoạt...' : 'Yêu cầu chạy lại dự báo thủ công'}</span>
-        </button>
+      <div className="pt-3 border-t border-[#E5E7EB] space-y-3 text-[14px] text-[#52525B]">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <span>
+            {triggerMessage || 'Hệ thống tự động cập nhật dự báo định kỳ vào sáng Thứ Hai hằng tuần.'}
+          </span>
+          {!showAdminPrompt && (
+            <button
+              type="button"
+              onClick={handleManualForecast}
+              disabled={isTriggering}
+              className="inline-flex items-center gap-1.5 text-[#166534] font-semibold hover:underline disabled:opacity-60 self-start sm:self-auto"
+            >
+              <RefreshCw className={`w-4 h-4 ${isTriggering ? 'animate-spin' : ''}`} />
+              <span>{isTriggering ? 'Đang kích hoạt...' : 'Yêu cầu chạy lại dự báo thủ công'}</span>
+            </button>
+          )}
+        </div>
+
+        {showAdminPrompt && (
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 bg-[#FDFBF7] border border-[#E5E7EB] rounded-lg p-3">
+            <label htmlFor="audit-admin-key" className="sr-only">
+              Mã quản trị hệ thống (X-Admin-Key)
+            </label>
+            <input
+              id="audit-admin-key"
+              type="password"
+              value={adminKeyInput}
+              onChange={(e) => setAdminKeyInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !isTriggering && adminKeyInput.trim()) {
+                  handleManualForecast();
+                }
+              }}
+              placeholder="Nhập mã quản trị (X-Admin-Key) để xác nhận..."
+              className="flex-1 min-w-0 px-3 py-2 text-[14px] bg-white border border-[#D4D4D8] rounded-md text-[#18181B] placeholder:text-[#71717A] focus:outline-none focus:ring-2 focus:ring-[#166534]"
+            />
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={handleManualForecast}
+                disabled={isTriggering || !adminKeyInput.trim()}
+                className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-md bg-[#166534] text-white text-[14px] font-semibold hover:bg-[#14532D] disabled:opacity-50"
+              >
+                <RefreshCw className={`w-4 h-4 ${isTriggering ? 'animate-spin' : ''}`} />
+                <span>{isTriggering ? 'Đang kích hoạt...' : 'Xác nhận chạy lại'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAdminPrompt(false);
+                  setAdminKeyInput('');
+                  setTriggerMessage(null);
+                }}
+                disabled={isTriggering}
+                className="px-3 py-2 rounded-md border border-[#E5E7EB] bg-white text-[#52525B] text-[14px] font-medium hover:bg-[#F4F4F5]"
+              >
+                Hủy
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </section>
   );

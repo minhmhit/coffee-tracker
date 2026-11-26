@@ -1,13 +1,14 @@
 FROM node:22-alpine AS builder
 
 WORKDIR /app
+ENV NODE_OPTIONS="--dns-result-order=ipv4first"
 
 RUN npm install -g pnpm@11.5.2
 
 COPY package.json ./
 COPY prisma ./prisma/
 
-RUN printf "fetch-retries=5\nfetch-timeout=120000\nnetwork-concurrency=4\n" > .npmrc && pnpm install --ignore-scripts
+RUN printf "fetch-retries=8\nfetch-timeout=300000\nnetwork-concurrency=2\n" > .npmrc && pnpm install --ignore-scripts
 
 COPY . .
 

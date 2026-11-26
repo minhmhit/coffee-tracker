@@ -7,6 +7,7 @@ import {
   FORECAST_QUEUE_NAME,
   FORECAST_WORKER_CONFIG,
 } from '../forecast.constants';
+import { isDirectQueueMode } from '../../common/queue-mode';
 
 @Injectable()
 export class ForecastScheduler implements OnModuleInit {
@@ -18,6 +19,12 @@ export class ForecastScheduler implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
+    if (isDirectQueueMode()) {
+      this.logger.log(
+        'QUEUE_MODE=direct detected — skipping BullMQ repeatable weekly forecast cron registration.',
+      );
+      return;
+    }
     await this.registerRepeatableJobs();
   }
 

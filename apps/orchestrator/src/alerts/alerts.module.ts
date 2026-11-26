@@ -30,6 +30,7 @@ import { AlertsController } from './alerts.controller';
     TelegramService,
     MorningBriefingService,
     TelegramBotService,
+    AlertProcessor,
     AlertScheduler,
     BullModule,
   ],

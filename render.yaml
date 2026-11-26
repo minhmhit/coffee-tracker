@@ -1,0 +1,46 @@
+services:
+  - type: web
+    name: coffee-tracker-orchestrator
+    runtime: docker
+    plan: free
+    region: singapore
+    rootDir: apps/orchestrator
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3001"
+      - key: TZ
+        value: Asia/Ho_Chi_Minh
+      - key: NODE_OPTIONS
+        value: --dns-result-order=ipv4first
+      - key: QUEUE_MODE
+        value: direct
+      - key: TELEGRAM_MODE
+        value: webhook
+      - key: TELEGRAM_BOT_USERNAME
+        value: minhmh_coffee_tracker_bot
+      - key: TELEGRAM_BRIEFING_CRON
+        value: 0 6 * * *
+      - key: ML_WAKE_BEFORE_FORECAST
+        value: "true"
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: ML_SERVICE_URL
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_CHAT_ID
+        sync: false
+      - key: TELEGRAM_WEBHOOK_SECRET
+        sync: false
+      - key: ADMIN_API_KEY
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false

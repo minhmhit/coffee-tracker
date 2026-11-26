@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { UnauthorizedException } from '@nestjs/common';
 import { getQueueToken } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
 import { Prisma } from '@prisma/client';
@@ -322,6 +323,48 @@ describe('Telegram Onboarding & Enriched Morning Briefing (Step 5.3)', () => {
       const result = await botService.syncBotCommands();
       expect(result.success).toBe(false);
       expect(result.error).toContain('Network timeout');
+    });
+  });
+
+  describe('6. Step 7.1 - Telegram Webhook Secret Token Verification', () => {
+    it('should reject webhook request when TELEGRAM_WEBHOOK_SECRET is not set', async () => {
+      delete process.env.TELEGRAM_WEBHOOK_SECRET;
+
+      await expect(
+        controller.handleTelegramWebhook('some-secret', { message: { text: '/today' } }),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('should reject webhook request with missing or invalid secret token', async () => {
+      process.env.TELEGRAM_WEBHOOK_SECRET = 'expected-webhook-secret';
+
+      await expect(
+        controller.handleTelegramWebhook(undefined, { message: { text: '/today' } }),
+      ).rejects.toThrow(UnauthorizedException);
+
+      await expect(
+        controller.handleTelegramWebhook('wrong-webhook-secret-xx', { message: { text: '/today' } }),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('should process valid /today update when X-Telegram-Bot-Api-Secret-Token matches', async () => {
+      process.env.TELEGRAM_WEBHOOK_SECRET = 'expected-webhook-secret';
+
+      const result = await controller.handleTelegramWebhook('expected-webhook-secret', {
+        update_id: 777123,
+        message: {
+          message_id: 1,
+          chat: { id: 999001 },
+          from: { id: 999001, first_name: 'Minh' },
+          text: '/today',
+        },
+      });
+
+      expect(result.ok).toBe(true);
+      expect(telegramService.sendMessageToChat).toHaveBeenCalledWith(
+        '999001',
+        expect.stringContaining('1. GIÁ CÀ PHÊ HÔM NAY'),
+      );
     });
   });
 });

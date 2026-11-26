@@ -6,8 +6,9 @@ import { TelegramService, TelegramSendResult } from '../telegram.service';
 import { AlertFormatter, AnomalyAlertData, SystemErrorData } from '../alert-formatter';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MorningBriefingService } from '../morning-briefing.service';
+import { getBullWorkerOptions } from '../../common/queue-mode';
 
-@Processor(ALERT_QUEUE_NAME)
+@Processor(ALERT_QUEUE_NAME, getBullWorkerOptions())
 export class AlertProcessor extends WorkerHost {
   private readonly logger = new Logger(AlertProcessor.name);
 
@@ -28,10 +29,10 @@ export class AlertProcessor extends WorkerHost {
 
     switch (job.name) {
       case ALERT_JOBS.MORNING_BRIEFING:
-        return this.handleMorningBriefing(job);
+        return this.executeMorningBriefing(job.data);
 
       case ALERT_JOBS.ANOMALY_ALERT:
-        return this.handleAnomalyAlert(job);
+        return this.executeAnomalyAlert(job.data);
 
       case ALERT_JOBS.SYSTEM_ERROR:
         return this.handleSystemError(job);
@@ -43,11 +44,11 @@ export class AlertProcessor extends WorkerHost {
   }
 
   /**
-   * Handles daily 06:00 AM Morning Market Briefing broadcast across all active subscribers
-   * and fallback .env chat_id.
+   * Executes daily 06:00 AM Morning Market Briefing broadcast across all active subscribers
+   * and fallback .env chat_id. Invoked both by BullMQ and direct HTTP trigger mode.
    */
-  private async handleMorningBriefing(job: Job<any>): Promise<any> {
-    const slot = job.data?.slot || '0600';
+  async executeMorningBriefing(data?: { slot?: string; force?: boolean; trigger?: string }): Promise<any> {
+    const slot = data?.slot || '0600';
 
     // Build enriched HTML via shared MorningBriefingService when injected, or direct fallback
     let dateStr: string;
@@ -72,7 +73,7 @@ export class AlertProcessor extends WorkerHost {
     }
 
     const briefingKey = `${dateStr}_${slot}`;
-    if (this.sentBriefings.has(briefingKey) && !job.data?.force) {
+    if (this.sentBriefings.has(briefingKey) && !data?.force) {
       this.logger.log(`Morning briefing for ${briefingKey} already sent. Skipping duplicate.`);
       return { skipped: true, duplicate: true };
     }
@@ -208,9 +209,9 @@ export class AlertProcessor extends WorkerHost {
 
   /**
    * Handles instant Hot Anomaly Alert (|z_score| > 2.5).
+   * Public so QUEUE_MODE=direct ingestion can dispatch alerts without Redis queues.
    */
-  private async handleAnomalyAlert(job: Job<AnomalyAlertData>): Promise<any> {
-    const data = job.data;
+  async executeAnomalyAlert(data: AnomalyAlertData): Promise<any> {
     const dateStr = data.signalDate;
 
     if (this.sentAnomalies.has(dateStr)) {

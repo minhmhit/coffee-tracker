@@ -8,6 +8,7 @@ import {
   INGESTION_QUEUE_NAME,
 } from '../ingestion.constants';
 import { IngestionJobPayload } from '../processors/ingestion.processor';
+import { isDirectQueueMode } from '../../common/queue-mode';
 
 @Injectable()
 export class IngestionScheduler implements OnModuleInit {
@@ -19,6 +20,12 @@ export class IngestionScheduler implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
+    if (isDirectQueueMode()) {
+      this.logger.log(
+        'QUEUE_MODE=direct detected — skipping BullMQ repeatable ingestion cron registration.',
+      );
+      return;
+    }
     await this.registerRepeatableJobs();
   }
 
@@ -154,6 +161,39 @@ export class IngestionScheduler implements OnModuleInit {
       INGESTION_JOBS.MONTHLY_CLIMATE,
       {
         trigger: 'manual_dispatch',
+      },
+      {
+        attempts: INGESTION_JOB_OPTIONS.attempts,
+        backoff: INGESTION_JOB_OPTIONS.backoff,
+      },
+    );
+  }
+
+  /**
+   * Enqueues an ingestion job mapped from a logical job name (weather, morning_domestic, etc.).
+   */
+  async enqueueJobByType(jobType: string, targetDate?: string) {
+    const normalized = jobType.trim().toLowerCase();
+    let queueJobName: string = INGESTION_JOBS.DAILY_MARKET_DATA;
+
+    if (normalized === 'monthly_climate') {
+      queueJobName = INGESTION_JOBS.MONTHLY_CLIMATE;
+    } else if (
+      normalized === 'weather' ||
+      normalized === 'early_weather' ||
+      normalized === 'daily_weather'
+    ) {
+      queueJobName = INGESTION_JOBS.DAILY_WEATHER;
+    } else if (normalized === 'daily_ice_stocks' || normalized === 'ice_stocks') {
+      queueJobName = INGESTION_JOBS.DAILY_ICE_STOCKS;
+    }
+
+    this.logger.log(`Enqueuing [${queueJobName}] via HTTP sync (job=${normalized})...`);
+    return this.ingestionQueue.add(
+      queueJobName,
+      {
+        trigger: `http_sync_${normalized}`,
+        targetDate,
       },
       {
         attempts: INGESTION_JOB_OPTIONS.attempts,

@@ -10,6 +10,7 @@ import {
 import { ALERT_JOBS, ALERT_QUEUE_NAME } from '../signals/signals.constants';
 import { Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
+import { isDirectQueueMode } from '../common/queue-mode';
 
 export interface MLHorizonPrediction {
   horizon_week: number;
@@ -50,9 +51,16 @@ export class ForecastService {
   ) {}
 
   /**
-   * Enqueues an on-demand or cron-triggered weekly forecast computation.
+   * Executes or enqueues an on-demand or cron-triggered weekly forecast computation.
    */
   async triggerForecast(trigger: string = 'manual') {
+    if (isDirectQueueMode()) {
+      this.logger.log(
+        `QUEUE_MODE=direct: executing weekly forecast pipeline synchronously (trigger: ${trigger})...`,
+      );
+      return this.executeForecastPipeline(trigger);
+    }
+
     this.logger.log(`Enqueuing weekly forecast job (trigger: ${trigger})...`);
     return this.forecastQueue.add(
       FORECAST_JOBS.GENERATE_WEEKLY_FORECAST,
@@ -64,6 +72,67 @@ export class ForecastService {
         removeOnFail: 500,
       },
     );
+  }
+
+  /**
+   * Sends a best-effort GET /health wake-up ping to the Python ML service (e.g., HF Spaces cold start)
+   * before submitting the heavy 26-week Walk-Forward POST request.
+   */
+  async wakeMlService(): Promise<void> {
+    const baseUrl = (process.env.ML_SERVICE_URL || 'http://localhost:8000').replace(/\/+$/, '');
+    const healthUrl = `${baseUrl}/health`;
+
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      try {
+        const res = await fetch(healthUrl, {
+          method: 'GET',
+          headers: { 'User-Agent': 'CoffeeTracker-Orchestrator/1.0' },
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+        if (res.ok) {
+          this.logger.log(`ML service wake-up health check succeeded (attempt ${attempt}).`);
+          return;
+        }
+        this.logger.warn(`ML wake-up attempt ${attempt} returned HTTP ${res.status}`);
+      } catch (err: any) {
+        clearTimeout(timeoutId);
+        this.logger.warn(`ML wake-up attempt ${attempt} failed: ${err.message}`);
+      }
+      if (attempt < 3) {
+        await new Promise((r) => setTimeout(r, 3000));
+      }
+    }
+  }
+
+  /**
+   * Runs the full weekly forecast pipeline end-to-end without Redis queues.
+   */
+  async executeForecastPipeline(trigger: string = 'manual') {
+    let forecastDate = new Date();
+    try {
+      await this.wakeMlService();
+      const payload = await this.buildForecastPayload();
+      forecastDate = new Date(payload.run_date);
+      const mlResponse = await this.callMlService(payload);
+      const runRecord = await this.persistSuccessfulForecast(forecastDate, mlResponse);
+
+      return {
+        id: runRecord.run_id,
+        mode: 'direct',
+        trigger,
+        runId: runRecord.run_id,
+        forecastDate: payload.run_date,
+        predictionsCount: mlResponse.predictions.length,
+        metrics: mlResponse.metrics,
+      };
+    } catch (err: any) {
+      this.logger.error(`Direct forecast pipeline failed: ${err.message}`);
+      await this.persistFailedForecast(forecastDate, err.message);
+      throw err;
+    }
   }
 
   /**
@@ -234,21 +303,23 @@ export class ForecastService {
       },
     });
 
-    try {
-      await this.alertQueue.add(
-        ALERT_JOBS.SYSTEM_ERROR,
-        {
-          queueName: FORECAST_QUEUE_NAME,
-          jobId: runId,
-          jobName: FORECAST_JOBS.GENERATE_WEEKLY_FORECAST,
-          attempts: 2,
-          maxAttempts: 2,
-          errorMessage,
-        },
-        { priority: 1 },
-      );
-    } catch (alertErr: any) {
-      this.logger.error(`Failed to dispatch alert for failed forecast run: ${alertErr.message}`);
+    if (!isDirectQueueMode()) {
+      try {
+        await this.alertQueue.add(
+          ALERT_JOBS.SYSTEM_ERROR,
+          {
+            queueName: FORECAST_QUEUE_NAME,
+            jobId: runId,
+            jobName: FORECAST_JOBS.GENERATE_WEEKLY_FORECAST,
+            attempts: 2,
+            maxAttempts: 2,
+            errorMessage,
+          },
+          { priority: 1 },
+        );
+      } catch (alertErr: any) {
+        this.logger.error(`Failed to dispatch alert for failed forecast run: ${alertErr.message}`);
+      }
     }
 
     return failedRun;
