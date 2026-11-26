@@ -7,6 +7,7 @@ Global Horizon-Conditioned Model with Strict Training Cutoff (s + h <= t_0)
 from __future__ import annotations
 
 import logging
+import os
 import time
 from datetime import date, timedelta
 from typing import Dict, List, Optional, Tuple
@@ -118,7 +119,7 @@ def train_lightgbm_quantile_models(
             "colsample_bytree": 0.8,
             "random_state": random_state,
             "verbosity": -1,
-            "n_jobs": -1,
+            "n_jobs": int(os.getenv("LGBM_NUM_THREADS", "1")),
         }
         booster = lgb.train(params, dtrain, num_boost_round=100)
         models[alpha] = booster

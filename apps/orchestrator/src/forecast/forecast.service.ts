@@ -193,12 +193,17 @@ export class ForecastService {
    */
   async callMlService(payload: any): Promise<MLForecastResponse> {
     const mlUrl = `${process.env.ML_SERVICE_URL || 'http://localhost:8000'}/api/v1/forecast/weekly`;
-    this.logger.log(`Dispatching forecast payload to ML service at ${mlUrl}...`);
+    const parsedTimeout = parseInt(process.env.ML_SERVICE_TIMEOUT_MS || '', 10);
+    const timeoutMs =
+      Number.isFinite(parsedTimeout) && parsedTimeout > 0
+        ? parsedTimeout
+        : FORECAST_WORKER_CONFIG.timeoutMs;
+    this.logger.log(`Dispatching forecast payload to ML service at ${mlUrl} (timeout: ${timeoutMs}ms)...`);
 
     const controller = new AbortController();
     const timeoutId = setTimeout(
       () => controller.abort(),
-      FORECAST_WORKER_CONFIG.timeoutMs,
+      timeoutMs,
     );
 
     try {
@@ -230,7 +235,8 @@ export class ForecastService {
       return data;
     } catch (err: any) {
       clearTimeout(timeoutId);
-      const errMsg = err.name === 'AbortError' ? 'ML service timeout after 180s' : err.message;
+      const timeoutSec = Math.round(timeoutMs / 1000);
+      const errMsg = err.name === 'AbortError' ? `ML service timeout after ${timeoutSec}s` : err.message;
       this.logger.error(`Failed to call ML service: ${errMsg}`);
       throw new Error(errMsg);
     }

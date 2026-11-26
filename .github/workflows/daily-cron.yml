@@ -88,26 +88,26 @@ jobs:
           echo "::error::Orchestrator failed to wake up within 150 seconds."
           exit 1
 
-      - name: Wake Hugging Face ML Space before weekly forecast
+      - name: Wake ML Service before weekly forecast
         if: steps.resolve.outputs.job == 'weekly_forecast'
         shell: bash
         env:
           ML_SERVICE_URL: ${{ secrets.ML_SERVICE_URL }}
         run: |
           if [ -z "$ML_SERVICE_URL" ]; then
-            echo "ML_SERVICE_URL secret is not set; skipping dedicated ML Space wake-up (Orchestrator will wake via internal config)."
+            echo "ML_SERVICE_URL secret is not set; skipping dedicated ML wake-up (Orchestrator will wake via internal config)."
             exit 0
           fi
           ML_BASE="${ML_SERVICE_URL%/}"
           for attempt in $(seq 1 15); do
-            echo "Pinging ML Space health ($attempt/15): $ML_BASE/health"
+            echo "Pinging ML Service health ($attempt/15): $ML_BASE/health"
             if curl -sf --max-time 10 "$ML_BASE/health" > /dev/null; then
-              echo "ML Space is awake and ready!"
+              echo "ML Service is awake and ready!"
               exit 0
             fi
             sleep 10
           done
-          echo "::error::ML Space failed to wake up within 150 seconds."
+          echo "::error::ML Service failed to wake up within 150 seconds."
           exit 1
 
       - name: Execute authenticated Coffee Tracker endpoint
@@ -132,7 +132,7 @@ jobs:
                 -d '{"force":false}')
               ;;
             weekly_forecast)
-              TIMEOUT=240
+              TIMEOUT=360
               ENDPOINT="$BASE_URL/api/forecast/trigger"
               STATUS=$(curl -sS -o "$BODY_FILE" -w "%{http_code}" \
                 --max-time "$TIMEOUT" \
