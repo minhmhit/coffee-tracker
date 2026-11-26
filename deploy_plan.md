@@ -51,7 +51,7 @@ Tách từng thành phần lên nền tảng chuyên biệt có gói miễn phí
 | **PostgreSQL 17** | **Neon Postgres Free** | 1 GB storage/project, 100 CU-hours/tháng, tự scale-to-zero sau 5 phút idle | **Không** | **Rất tốt** — DB 10 MB chỉ dùng ~1% dung lượng |
 | **Redis 7** | **Upstash Redis Free** | 500.000 commands/tháng, 256 MB RAM, 10 GB bandwidth | **Không** | **Đạt (nếu tắt polling)** — Cần chỉnh BullMQ hoặc bỏ queue polling |
 | **Backend (`apps/orchestrator`)** | **Render Free Web Service** | 512 MB RAM, 0.1 CPU, tự tắt sau 15 phút không có traffic (cold start 50–60s) | **Không** | **Đạt** — RAM thực ~60–105 MiB vừa gọn trong 512 MB; cần Webhook + GitHub Actions Cron |
-| **ML Engine (`apps/ml-service`)** | **Hugging Face Spaces (Docker CPU Basic)** *(hoặc Render Free thứ 2)* | HF: 2 vCPU, **16 GB RAM**, Docker SDK; Render: 512 MB RAM / 0.1 CPU | **Không** *(HF cần email xác minh; một số tài khoản mới nên kiểm tra quyền tạo Docker Space)* | **Khuyến nghị HF Spaces** nhờ **2 vCPU / 16 GB RAM** tránh timeout 28s–180s khi tính Walk-Forward CV |
+| **ML Engine (`apps/ml-service`)** | **Render Free Web Service #2** *(hoặc **Leapcell Free**)* | Render: 512 MB RAM, 0.1 CPU (đo thực tế `174.2 MiB`, xong trong `127.72s`); Leapcell: 1 vCPU (~`8.85s`), timeout 15 phút | **Không** *(Lưu ý 2026: Hugging Face Free chỉ còn Static HTML, Docker cần PRO/thẻ)* | **Đạt** — Dùng chung `render.yaml` (`ML_SERVICE_TIMEOUT_MS=300000`) hoặc tách Leapcell |
 | **Lịch chạy Cron (05:45, 06:00, 08:30, T2 02:00)** | **GitHub Actions Schedule** | 2.000 phút/tháng miễn phí cho private repo (không giới hạn với public repo) | **Không** | **Bắt buộc thay thế cron nội bộ** vì Render ngủ sau 15 phút |
 
 *(Lưu ý kiểm tra 2026: **Koyeb** đã yêu cầu thẻ xác minh/tạm giữ pre-auth hold nên bị loại khỏi phương án không cần thẻ).*
@@ -113,11 +113,11 @@ Tách từng thành phần lên nền tảng chuyên biệt có gói miễn phí
 
 ### 4.3 Trần RAM `512 MB` & CPU `0.1` cho `ml-service` (Walk-Forward CV)
 
-- **Vấn đề:** Thực đo local cho thấy `ml-service` chiếm `171.7 MiB` RAM nhưng **burst lên `554.12%` CPU trong `28.26s`** để fit 12 mốc VECM + LightGBM Quantile. Nếu đặt `ml-service` lên Render Free (`0.1 CPU`, `512 MB`), thời gian chạy sẽ giãn ra **~120–240 giây**, dễ vượt quá HTTP timeout 100s của Render Proxy và nguy cơ OOM khi OpenMP tạo nhiều luồng.
-- **Giải pháp bắt buộc:**
-  1. Đặt `apps/ml-service` lên **Hugging Face Spaces (Docker Space — CPU Basic 2 vCPU / 16 GB RAM Free)** — hoàn toàn không lo giới hạn `512 MB` RAM và có tới 2 vCPU thật.
-  2. Giới hạn số luồng OpenMP trong Dockerfile/Env (`OMP_NUM_THREADS=1`, `OPENBLAS_NUM_THREADS=1`, `MKL_NUM_THREADS=1`) để tránh tràn RAM vì đa luồng.
-  3. Tại NestJS (`ForecastProcessor` / endpoint cron Thứ Hai), tăng HTTP client timeout lên `180_000ms` và đánh thức HF Space (`GET /health`) trước `60s` rồi mới `POST /api/v1/forecast/weekly`.
+- **Vấn đề & Đo đạc thực tế (26/11/2026):** Khi chạy đa luồng mặc định, `ml-service` đạt `554%` CPU trong `28,26s`. Sau khi ép đơn luồng (`OMP_NUM_THREADS=1`, `LGBM_NUM_THREADS=1`), thời gian chạy thực tế trên local giảm còn **`8,85s`** với đỉnh RAM **`174,2 MiB`**; khi mô phỏng giới hạn **`0.1 vCPU`** của Render Free, pipeline hoàn tất HTTP `200` trong **`127,72 giây`**.
+- **Giải pháp áp dụng:**
+  1. Giữ đơn luồng (`OMP_NUM_THREADS=1`, `OPENBLAS_NUM_THREADS=1`, `MKL_NUM_THREADS=1`, `NUMEXPR_NUM_THREADS=1`, `LGBM_NUM_THREADS=1`) để tránh OOM và tranh chấp luồng trên container nhỏ.
+  2. Deploy `apps/ml-service` lên **Render Free #2** (khai báo sẵn trong `render.yaml`, dùng `ML_SERVICE_TIMEOUT_MS=300000` ở Orchestrator) hoặc **Leapcell Free** (`1 vCPU`, ~`9s`, không cần thẻ) thay thế Hugging Face Docker (đã khóa trả phí).
+  3. Tại GitHub Actions (`daily-cron.yml`), gọi đánh thức `GET /health` trước khi trigger `/api/forecast/trigger` với `TIMEOUT=360s`.
 
 ### 4.4 Vercel SSR Timeout `10 giây` khi Backend Render đang Ngủ
 
@@ -179,10 +179,9 @@ Tách từng thành phần lên nền tảng chuyên biệt có gói miễn phí
    ```
 3. (Nếu dùng chế độ queue) Tạo database trên **Upstash Redis** -> lấy `REDIS_URL`.
 
-### Bước 3 — Deploy ML Service lên Hugging Face Spaces
-1. Tạo Docker Space trên **Hugging Face** (`CPU Basic 2 vCPU / 16GB RAM` — Free).
-2. Lưu ý HF Spaces lắng nghe cổng **`7860`** mặc định (`EXPOSE 7860` hoặc `CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "7860"]` thông qua biến `PORT=7860`).
-3. Kiểm tra `GET https://<space>.hf.space/health` -> `{"status":"ok"}`.
+### Bước 3 — Deploy ML Service lên Render Free #2 (hoặc Leapcell Free)
+1. Deploy bằng **Render Blueprint (`render.yaml`)** để tạo `coffee-tracker-ml` (`Free`, `Singapore`, `OMP_NUM_THREADS=1`, `LGBM_NUM_THREADS=1`), hoặc deploy trên **Leapcell Free** (không cần thẻ, `1 vCPU`).
+2. Kiểm tra `GET https://<ml-service-url>/health` -> `{"status":"ok","service":"coffee-tracker-ml"}`.
 
 ### Bước 4 — Deploy Backend Orchestrator lên Render Free
 1. Tạo **Web Service** trỏ repo GitHub, `Root Directory: apps/orchestrator`, Dockerfile có sẵn.

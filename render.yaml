@@ -28,6 +28,8 @@ services:
         value: 0 6 * * *
       - key: ML_WAKE_BEFORE_FORECAST
         value: "true"
+      - key: ML_SERVICE_TIMEOUT_MS
+        value: "300000"
       - key: DATABASE_URL
         sync: false
       - key: REDIS_URL
@@ -44,3 +46,27 @@ services:
         sync: false
       - key: CORS_ORIGIN
         sync: false
+
+  - type: web
+    name: coffee-tracker-ml
+    runtime: docker
+    plan: free
+    region: singapore
+    rootDir: apps/ml-service
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: TZ
+        value: Asia/Ho_Chi_Minh
+      - key: OMP_NUM_THREADS
+        value: "1"
+      - key: OPENBLAS_NUM_THREADS
+        value: "1"
+      - key: MKL_NUM_THREADS
+        value: "1"
+      - key: NUMEXPR_NUM_THREADS
+        value: "1"
+      - key: LGBM_NUM_THREADS
+        value: "1"

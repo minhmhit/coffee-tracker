@@ -14,7 +14,8 @@ RUN pip install --no-cache-dir --default-timeout=300 --retries 10 -r requirement
 ENV OMP_NUM_THREADS=1 \
     OPENBLAS_NUM_THREADS=1 \
     MKL_NUM_THREADS=1 \
-    NUMEXPR_NUM_THREADS=1
+    NUMEXPR_NUM_THREADS=1 \
+    LGBM_NUM_THREADS=1
 
 COPY . .
 

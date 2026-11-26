@@ -227,6 +227,26 @@ describe('Forecast Module Suite (Step 4.1 & 4.2)', () => {
         /ML service timeout after 180s/,
       );
     });
+
+    it('should respect custom ML_SERVICE_TIMEOUT_MS override when configured', async () => {
+      const prev = process.env.ML_SERVICE_TIMEOUT_MS;
+      process.env.ML_SERVICE_TIMEOUT_MS = '300000';
+      const abortError = new Error('The operation was aborted');
+      abortError.name = 'AbortError';
+      global.fetch = jest.fn().mockRejectedValue(abortError);
+
+      try {
+        await expect(forecastService.callMlService({ test: 'payload' })).rejects.toThrow(
+          /ML service timeout after 300s/,
+        );
+      } finally {
+        if (prev === undefined) {
+          delete process.env.ML_SERVICE_TIMEOUT_MS;
+        } else {
+          process.env.ML_SERVICE_TIMEOUT_MS = prev;
+        }
+      }
+    });
   });
 
   describe('3. ForecastService - Transactional Persistence', () => {
